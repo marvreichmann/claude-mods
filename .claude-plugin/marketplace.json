@@ -1,11 +1,11 @@
 {
-  "name": "zycck-mods",
+  "name": "reichmann-mods",
   "owner": {
-    "name": "Kirill Serditov",
-    "url": "https://github.com/zycck"
+    "name": "Marvin Reichmann",
+    "url": "https://github.com/marvreichmann"
   },
   "metadata": {
-    "description": "Claude Code mods by zycck"
+    "description": "Safe fork of zycck/claude-mods. plan-progress with the host file write removed."
   },
   "plugins": [
     {

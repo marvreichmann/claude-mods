@@ -14,6 +14,8 @@ export async function boot(file, kept = new Map()) {
   const timers = []
   const every = []
   const sounds = []
+  const writes = []
+  const processes = []
   let toolSpec = null
   const $ = {
     __get(a) {
@@ -34,7 +36,13 @@ export async function boot(file, kept = new Map()) {
     },
     session: { id: async () => 'session-1' },
     audio: { play: async ({ asset }) => void sounds.push(asset) },
-    process: { run: async () => ({}) },
+    fs: { write: async (path, body) => void writes.push({ path, body }) },
+    process: {
+      run: async argv => {
+        processes.push([...(argv ?? [])])
+        return {}
+      },
+    },
     plugin: { root: '/plugin' },
     tool: { register: async spec => void (toolSpec = spec) },
     command: { register: async () => {} },
@@ -53,6 +61,8 @@ export async function boot(file, kept = new Map()) {
   const api = {
     $,
     sounds,
+    writes,
+    processes,
     coreRuns,
     get toolSpec() {
       return toolSpec

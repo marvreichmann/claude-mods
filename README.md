@@ -1,5 +1,7 @@
 # Claude Code mods
 
+Safe fork of [zycck/claude-mods](https://github.com/zycck/claude-mods) at plan-progress 0.5.0. Same bars. The undocumented `id: "reel"` recorder, which wrote a JSON file to the path in `note`, is gone. Windows sounds go through `sounds/play.ps1`, which allowlists the name and builds the wav path itself. Linux and macOS use the engine player only.
+
 ## plan-progress
 
 Live progress bars above the Claude Code prompt. Claude breaks medium and large tasks into stages and steps, and you watch them fill in real time, with the subagents working on each task right under its bar.
@@ -25,8 +27,8 @@ Live progress bars above the Claude Code prompt. Claude breaks medium and large 
 In Claude Code:
 
 ```
-/plugin marketplace add zycck/claude-mods
-/plugin install plan-progress@zycck-mods
+/plugin marketplace add marvreichmann/claude-mods
+/plugin install plan-progress@reichmann-mods
 ```
 
 Or copy `plugins/plan-progress` into `~/.claude/skills/plan-progress` to load it in every session.

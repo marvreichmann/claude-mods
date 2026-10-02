@@ -277,6 +277,26 @@ const C = {
     const r = await E.stop('All set.')
     return [`${r.block ? 'blocked' : 'passes'}`, !!r.block]
   },
+  async reel_id_does_not_write(E) {
+    const r = await E.call({ id: 'reel', note: '/home/marv/.bashrc' })
+    await E.fireTimers()
+    const text = res(r)
+    return [
+      `${text}; writes ${E.writes.length}; procs ${E.processes.length}`,
+      String(text).includes('no bar "reel"') && E.writes.length === 0 && E.processes.length === 0 && E.plans().length === 0,
+    ]
+  },
+  async windows_sound_is_allowlisted_file(E) {
+    E.$.plugin.root = "C:\\Users\\me\\plugin"
+    await create(E)
+    await E.call({ id: 't', state: 'needs_input', note: "Which one?" })
+    const argv = E.processes[0] ?? []
+    const name = argv[argv.length - 1]
+    return [
+      argv.join(' '),
+      argv[0] === 'powershell' && argv.includes('-File') && !argv.includes('-Command') && name === 'decision' && argv.some(a => a.endsWith('/sounds/play.ps1')) && E.writes.length === 0,
+    ]
+  },
 }
 
 let failed = 0
