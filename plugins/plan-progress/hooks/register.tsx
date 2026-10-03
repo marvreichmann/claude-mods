@@ -18,10 +18,15 @@ const FRAME_MS = 33
 const THEME_POLL_MS = 3000
 const PICKER = 'progress-style'
 const ABOUT: Record<BarStyle, string> = {
-  flow: 'particles streaming toward the head',
-  comet: 'a trail of sparks behind the head',
-  pixel: 'a grid of dots filling in toward the head',
+  flow: 'streaming particles',
+  comet: 'sparks trailing the pill',
+  pixel: 'dots filling in',
+  rain: 'dots raining down',
+  ripple: 'rings pulsing from the pill',
 }
+// Picker columns: the button, then the sample, then the description.
+const PICK_BUTTON = 12
+const PICK_ABOUT = 30
 // The sample each picker row animates: two stages, partway through the second.
 const SAMPLE: Plan = {
   id: 'sample',
@@ -509,7 +514,7 @@ export const register: Register = on => {
     const { Box, Text, Button, Raster } = $.ui.resolve(e)
     const current = await read($, style)
     useTheme((await read($, theme)) ?? undefined)
-    const width = Math.max(10, Math.min(40, e.props.bodyColumns - 52))
+    const width = Math.max(10, Math.min(48, e.props.bodyColumns - PICK_BUTTON - PICK_ABOUT - 6))
     for (const [id, bar] of mounted) if (bar.requestId === e.requestId) mounted.delete(id)
 
     return (
@@ -527,7 +532,7 @@ export const register: Register = on => {
             })().catch(() => undefined)
           return (
             <Box key={`pick:${name}`} flexDirection="row" gap={2} marginBottom={1}>
-              <Box width={12}>
+              <Box width={PICK_BUTTON} flexShrink={0}>
                 <Button
                   key={`style:${name}`}
                   label={name}
@@ -537,15 +542,19 @@ export const register: Register = on => {
                   onPress={choose}
                 />
               </Box>
-              <Raster
-                key={`bar:${id}`}
-                columns={width}
-                rows={1}
-                cells={encode(barCells(SAMPLE, width, shown.get(id) ?? 0, frame, name))}
-              />
-              <Text dimColor wrap="truncate-end">
-                {name === current ? `${ABOUT[name]} (current)` : ABOUT[name]}
-              </Text>
+              <Box width={width} flexShrink={0}>
+                <Raster
+                  key={`bar:${id}`}
+                  columns={width}
+                  rows={1}
+                  cells={encode(barCells(SAMPLE, width, shown.get(id) ?? 0, frame, name))}
+                />
+              </Box>
+              <Box width={PICK_ABOUT} flexShrink={1}>
+                <Text dimColor wrap="truncate-end">
+                  {name === current ? `${ABOUT[name]} (current)` : ABOUT[name]}
+                </Text>
+              </Box>
             </Box>
           )
         })}

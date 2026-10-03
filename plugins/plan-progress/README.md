@@ -16,6 +16,8 @@ On Omarchy, running bars take the active theme's `accent` color, and the empty t
 - `flow` (default): braille particles streaming toward the head, smooth spring easing; solid green when done
 - `comet`: the pill leads a glowing trail shedding sparks, stars ahead; solid green when done
 - `pixel`: a grid of dots four rows deep on a tinted bar, filling in toward the pill, each dot switching on and off on its own
+- `rain`: digital rain falling through the dot grid, heavier toward the pill
+- `ripple`: sonar rings pulsing out from the pill back through the dot grid
 
 ## Commands
 

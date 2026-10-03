@@ -113,7 +113,7 @@ const noise =(a: number, b: number): number => {
   return ((x ^ (x >>> 16)) >>> 0) / 4294967296
 }
 
-export const STYLES = ['flow', 'comet', 'pixel'] as const
+export const STYLES = ['flow', 'comet', 'pixel', 'rain', 'ripple'] as const
 export type BarStyle = (typeof STYLES)[number]
 export const isStyle = (name: string): name is BarStyle => (STYLES as readonly string[]).includes(name)
 
@@ -233,6 +233,56 @@ const pixel = (plan: Plan, c: Cells, frame: number) => {
   })
 }
 
+/**
+ * A braille fill: `lit(sx, dy, near)` says whether the dot at sub-column `sx`
+ * (two per cell) and row `dy` (0..3) shows; each cell glows brighter near the head.
+ */
+const dots = (c: Cells, lit: (sx: number, dy: number, near: number) => boolean) => {
+  const { put, colors, ticks } = c
+  headed(c, (x, start) => {
+    if (ticks.get(x)) return put(x, 0x2502, colors.tick, colors.fill)
+    const near = x / Math.max(1, start)
+    let bits = 0
+    for (let dx = 0; dx < 2; dx++) {
+      for (let dy = 0; dy < 4; dy++) if (lit(2 * x + dx, dy, near)) bits |= BRAILLE[dx]![dy]!
+    }
+    put(x, 0x2800 + bits, mix(colors.dot, colors.hi, 0.25 + 0.75 * near), colors.fill)
+  })
+}
+
+/** Digital rain: drops fall through the four rows of dots, more of them toward the head. */
+const rain = (plan: Plan, c: Cells, frame: number) => {
+  const t = plan.status === 'active' ? frame : 0
+  dots(c, (sx, dy, near) => {
+    if (plan.status === 'done') return noise(sx, dy * 7) < 0.5
+    // A column rains only some of the time; busier near the head.
+    if (noise(sx, 101) > 0.3 + 0.65 * near) return false
+    const speed = 0.12 + 0.16 * noise(sx, 202)
+    const cycle = 6 + Math.floor(noise(sx, 303) * 8)
+    const head = (t * speed + noise(sx, 404) * cycle) % cycle
+    // The drop's head and the dot just above it.
+    return dy === Math.floor(head) || dy === Math.floor(head) - 1
+  })
+}
+
+/** Sonar: rings of dots pulse out from the head, back through the grid. */
+const ripple = (plan: Plan, c: Cells, frame: number) => {
+  const pillWidth = Math.min(c.width, c.label.length + 2)
+  const origin = 2 * Math.min(c.width, Math.max(pillWidth, Math.floor(c.head))) - 2 * pillWidth
+  const t = plan.status === 'active' ? frame * 0.55 : 0
+  const PERIOD = 11
+  dots(c, (sx, dy, near) => {
+    if (plan.status === 'done') return (sx + dy) % 2 === 0
+    // Dot rows are about as far apart as dot columns: measure the ring in those units.
+    const d = Math.hypot(origin - sx, (dy - 1.5) * 1.6)
+    const phase = (((d - t) % PERIOD) + PERIOD) % PERIOD
+    // Whole arcs near the pill, wearing thin as they travel.
+    const ring = phase < 1.6 && noise(sx, dy * 13) < 0.25 + 0.75 * near
+    const dust = noise(sx * 4 + dy, 77) < 0.04
+    return ring || dust
+  })
+}
+
 /** A finished bar in one solid color, the pill at its end. */
 const solid = (c: Cells) => headed(c, x => c.put(x, 0x20, c.colors.pill, c.colors.pill))
 
@@ -293,6 +343,8 @@ const DRAW: Record<BarStyle, (plan: Plan, c: Cells, frame: number) => void> = {
   pixel,
   flow,
   comet,
+  rain,
+  ripple,
 }
 
 /** One row of Raster cells for `plan` at `shown` (0..1) in the given style. */
