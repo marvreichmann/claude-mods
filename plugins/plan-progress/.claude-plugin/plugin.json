@@ -1,8 +1,12 @@
 {
   "name": "plan-progress",
-  "version": "0.5.1",
-  "description": "Live plan progress bars above the Claude Code prompt: stages, steps, a pixel fill and soft sounds for decision, error and done",
-  "author": { "name": "Kirill Serditov", "url": "https://github.com/zycck" },
+  "displayName": "Plan Progress",
+  "version": "1.0.0",
+  "description": "Live progress bars above the prompt for task lists and multi-stage plans, in five animated styles, with stage ticks and sounds",
+  "author": { "name": "Marvin Reichmann", "url": "https://github.com/marvreichmann" },
+  "homepage": "https://github.com/marvreichmann/claude-mods/tree/main/plugins/plan-progress",
+  "repository": "https://github.com/marvreichmann/claude-mods",
   "license": "MIT",
+  "keywords": ["progress", "plans", "tasks", "terminal", "mod"],
   "types": "./types/index.d.ts"
 }

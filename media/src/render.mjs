@@ -1,10 +1,12 @@
-// Renders demo.html into media/clickable-links.mp4 and .gif.
+// Renders media/src/<name>/demo.html into media/<name>.mp4 and .gif.
 //
-//   node media/src/clickable-links/render.mjs
+//   node media/src/render.mjs clickable-links
+//   node media/src/render.mjs plan-progress
 //
 // Needs Node 22+ (global fetch and WebSocket), Chromium or Chrome, and ffmpeg.
-// Headless Chromium draws each frame with every animation seeked to its time,
-// so the clip is the same on every run and never drops a frame.
+// A scene sets `window.DURATION` (seconds), resolves `window.ready` once laid
+// out, and draws any moment with `window.seek(seconds)`. Headless Chromium
+// draws each frame that way, so the clip is the same on every run.
 import { spawn, execFileSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -12,15 +14,16 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const MEDIA = join(HERE, '..', '..')
-const SECONDS = 5
+const MEDIA = join(HERE, '..')
+const NAME = process.argv[2]
+if (!NAME) throw new Error('usage: node media/src/render.mjs <scene name>')
 const FPS = 30
 const WIDTH = 1280
 const HEIGHT = 720
 const PORT = 9333
 const BROWSER = process.env.CHROME ?? 'chromium'
 
-const work = mkdtempSync(join(tmpdir(), 'clickable-links-demo-'))
+const work = mkdtempSync(join(tmpdir(), `${NAME}-demo-`))
 const chrome = spawn(BROWSER, [
   '--headless=new', '--disable-extensions', `--remote-debugging-port=${PORT}`, `--user-data-dir=${join(work, 'profile')}`,
   `--window-size=${WIDTH},${HEIGHT}`, '--hide-scrollbars', '--force-color-profile=srgb', 'about:blank',
@@ -65,11 +68,12 @@ const evaluate = expression => send('Runtime.evaluate', { expression, awaitPromi
 
 try {
   await send('Emulation.setDeviceMetricsOverride', { width: WIDTH, height: HEIGHT, deviceScaleFactor: 1, mobile: false })
-  await send('Page.navigate', { url: pathToFileURL(join(HERE, 'demo.html')).href })
+  await send('Page.navigate', { url: pathToFileURL(join(HERE, NAME, 'demo.html')).href })
   await sleep(500)
   await evaluate('window.ready')
 
-  const frames = SECONDS * FPS
+  const { result } = await evaluate('window.DURATION')
+  const frames = Math.round(result.value * FPS)
   for (let frame = 0; frame < frames; frame++) {
     await evaluate(`seek(${frame / FPS})`)
     const { data } = await send('Page.captureScreenshot', { format: 'png' })
@@ -83,9 +87,9 @@ try {
 const frames = join(work, 'frame-%04d.png')
 const ffmpeg = args => execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...args], { stdio: 'inherit' })
 ffmpeg(['-framerate', `${FPS}`, '-i', frames, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20',
-  '-movflags', '+faststart', join(MEDIA, 'clickable-links.mp4')])
+  '-movflags', '+faststart', join(MEDIA, `${NAME}.mp4`)])
 ffmpeg(['-framerate', `${FPS}`, '-i', frames, '-vf',
   'fps=20,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=sierra2_4a',
-  join(MEDIA, 'clickable-links.gif')])
+  join(MEDIA, `${NAME}.gif`)])
 
 console.log(`frames in ${work}`)

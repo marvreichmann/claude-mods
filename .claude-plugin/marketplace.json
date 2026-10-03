@@ -5,13 +5,13 @@
     "url": "https://github.com/marvreichmann"
   },
   "metadata": {
-    "description": "Claude Code mods by Marvin Reichmann: clickable links, and plan-progress (a safe fork of zycck/claude-mods)."
+    "description": "Claude Code mods by Marvin Reichmann: clickable links and plan-progress bars."
   },
   "plugins": [
     {
       "name": "plan-progress",
       "source": "./plugins/plan-progress",
-      "description": "Live plan progress bars above the Claude Code prompt with soft sounds"
+      "description": "Live progress bars above the prompt for task lists and multi-stage plans, in five animated styles, with stage ticks and sounds"
     },
     {
       "name": "clickable-links",

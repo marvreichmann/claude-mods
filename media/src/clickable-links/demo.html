@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=block" rel="stylesheet">
 <style>
-  /* A 5 s clip. render.mjs seeks every animation to each frame's time, so
+  /* A 5 s clip. media/src/render.mjs seeks every animation to each frame's time, so
      the timeline is all here: delays are absolute times from 0. */
   :root {
     --bg-1: #1b1530;
@@ -201,6 +201,7 @@
     document.documentElement.style.setProperty(`--${name}y`, `${y}px`)
     return [x, y]
   }
+  window.DURATION = 5
   window.ready = document.fonts.ready.then(() => {
     seek(2.5) // measure with the terminal settled, past its entrance
     const [x1, y1] = aim(document.getElementById('target1'), 'a')
