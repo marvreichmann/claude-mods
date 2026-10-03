@@ -1,4 +1,4 @@
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 
 import { barCells, listPlan, parseTheme, pillText, progressOf, STYLES, useTheme } from './bar'
 import type { Plan } from '../types'
@@ -122,4 +122,34 @@ test('TodoWrite draws a bar above the prompt', async ($, on) => {
 
   await ui.press({ key: 'x:tasks:main' })
   expect(await ui.find({ key: 'bar:tasks:main' })).toBeUndefined()
+})
+
+test('the style picker lists every style and keeps the one pressed', async ($, on) => {
+  mock.store(on)
+  const closed: string[] = []
+  on('ui.close', (_$, e) => {
+    closed.push(e.id)
+    return { value: undefined }
+  })
+  const ui = await $.ui.mount({
+    plugin: 'plan-progress',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'progress-style',
+    props: { title: 'Progress bar style', isFocused: true, bodyColumns: 100, placement: 'inline', scroll: { offset: 0, bodyRows: 8 } },
+  } as never)
+  for (const name of STYLES) expect(await ui.find({ key: `style:${name}` })).toBeDefined()
+  expect(await ui.find({ key: 'bar:sample-flow' })).toBeDefined()
+
+  await ui.press({ key: 'style:comet' })
+  expect(closed).toEqual(['progress-style'])
+  await ui.unmount()
+  const again = await $.ui.mount({
+    plugin: 'plan-progress',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'progress-style',
+    props: { title: 'Progress bar style', isFocused: true, bodyColumns: 100, placement: 'inline', scroll: { offset: 0, bodyRows: 8 } },
+  } as never)
+  expect((await again.find({ key: 'style:comet' }))?.props.variant).toBe('primary')
 })

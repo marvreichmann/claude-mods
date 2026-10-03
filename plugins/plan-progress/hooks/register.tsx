@@ -16,6 +16,20 @@ const HIDE_DONE_MS = 30_000
 // 30 frames a second, the band's redraw ceiling; animations count in 50ms ticks.
 const FRAME_MS = 33
 const THEME_POLL_MS = 3000
+const PICKER = 'progress-style'
+const ABOUT: Record<BarStyle, string> = {
+  flow: 'particles streaming toward the head',
+  comet: 'a trail of sparks behind the head',
+  pixel: 'a dithered, twinkling fill',
+}
+// The sample each picker row animates: two stages, partway through the second.
+const SAMPLE: Plan = {
+  id: 'sample',
+  title: 'Sample',
+  stages: [{ name: 'Build', total: 2, done: 2 }, { name: 'Test', total: 3, done: 2 }],
+  current: 1,
+  status: 'active',
+}
 
 type ProgressInput = {
   plan: string
@@ -253,7 +267,7 @@ export const register: Register = on => {
     })
     await $.command.register({
       name: 'progress',
-      description: 'Progress bars: /progress demo | styles | try [name|stop] | style <name> | clear | mute | unmute',
+      description: 'Progress bars: /progress style (picker) | style <name> | try [name|stop] | styles | demo | clear | mute | unmute',
     })
     const stored = await $.store.get('muted')
     if (stored === true) await update($, muted, () => true)
@@ -422,14 +436,18 @@ export const register: Register = on => {
       preview = timer
       return { text: `Previewing ${STYLES.length} styles one after the other. Pick one with /progress style <name>.` }
     }
-    if (arg.startsWith('style')) {
+    if (arg === 'style') {
+      await $.ui.open({ id: PICKER, title: 'Progress bar style', focus: true, closeOnEscape: true, holdToasts: true, rows: STYLES.length * 2 + 1 })
+      return { text: 'Pick a style: arrows and Enter, or its number; Esc closes.' }
+    }
+    if (arg.startsWith('style ')) {
       const name = arg.slice('style'.length).trim()
       if (!isStyle(name)) return { text: `Styles: ${STYLES.join(', ')}` }
       await update($, style, () => name)
       await $.store.set('style', name)
       return { text: `Progress bars now use the ${name} style.` }
     }
-    return { text: 'Usage: /progress demo | styles | try [name|stop] | style <name> | clear | mute | unmute' }
+    return { text: 'Usage: /progress style (picker) | style <name> | try [name|stop] | styles | demo | clear | mute | unmute' }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -437,7 +455,8 @@ export const register: Register = on => {
       ...Object.entries(await read($, lists)).map(([key, list]) => listPlan(key, list)),
       ...Object.values(await read($, plans)),
     ]
-    mounted.clear()
+    // Forget this band's bars; the picker's samples are the picker's.
+    for (const [id, bar] of mounted) if (bar.requestId === e.requestId) mounted.delete(id)
     // Raster cells are the terminal's alone; other surfaces keep their own band.
     if (e.surface !== 'terminal' || e.props.hasSurvey || views.length === 0) return next(e)
 
@@ -473,6 +492,60 @@ export const register: Register = on => {
                 <Text dimColor>{`${Math.round(progressOf(plan) * 100)}%`}</Text>
               </Box>
               <Button key={`x:${plan.id}`} label="×" plain dimColor onPress={() => void remove($, plan.id)} />
+            </Box>
+          )
+        })}
+      </Box>
+    )
+  })
+  // A closed picker's samples stop animating.
+  on('ui.close', { id: PICKER }, ($, e, next) => {
+    for (const name of STYLES) mounted.delete(`sample-${name}`)
+    return next(e)
+  })
+
+  on('ui.render', { component: 'Pane', requestId: PICKER }, async ($, e, next) => {
+    if (e.surface !== 'terminal') return next(e)
+    const { Box, Text, Button, Raster } = $.ui.resolve(e)
+    const current = await read($, style)
+    useTheme((await read($, theme)) ?? undefined)
+    const width = Math.max(10, Math.min(40, e.props.bodyColumns - 52))
+    for (const [id, bar] of mounted) if (bar.requestId === e.requestId) mounted.delete(id)
+
+    return (
+      <Box flexDirection="column" paddingX={1}>
+        {STYLES.map((name, i) => {
+          const id = `sample-${name}`
+          if (!shown.has(id)) shown.set(id, 0)
+          mounted.set(id, { requestId: e.requestId, width, plan: SAMPLE, style: name })
+          const choose = () =>
+            void (async () => {
+              await update($, style, () => name)
+              await $.store.set('style', name)
+              await $.ui.close({ id: PICKER })
+              $.ui.toast(`Progress bars now use the ${name} style.`)
+            })().catch(() => undefined)
+          return (
+            <Box key={`pick:${name}`} flexDirection="row" gap={2} marginBottom={1}>
+              <Box width={12}>
+                <Button
+                  key={`style:${name}`}
+                  label={name}
+                  hotkey={String(i + 1)}
+                  variant={name === current ? 'primary' : undefined}
+                  autoFocus={name === current ? true : undefined}
+                  onPress={choose}
+                />
+              </Box>
+              <Raster
+                key={`bar:${id}`}
+                columns={width}
+                rows={1}
+                cells={encode(barCells(SAMPLE, width, shown.get(id) ?? 0, frame, name))}
+              />
+              <Text dimColor wrap="truncate-end">
+                {name === current ? `${ABOUT[name]} (current)` : ABOUT[name]}
+              </Text>
             </Box>
           )
         })}

@@ -20,7 +20,8 @@ On Omarchy, running bars take the active theme's `accent` color (from `~/.local/
 ## Commands
 
 - `/progress demo`: two demo plans
-- `/progress style <name>`: pick a style (remembered)
+- `/progress style`: open a picker with a live sample of each style
+- `/progress style <name>`: pick a style directly (remembered)
 - `/progress try [name|stop]`: loop one style; again for the next
 - `/progress styles`: play every style once, one after the other
 - `/progress clear`: remove all bars
