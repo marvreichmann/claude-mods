@@ -13,7 +13,8 @@ const theme = atom({ plugin: 'plan-progress', key: 'theme' } as const, null)
 
 const TOOL = 'mcp__plan-progress__progress'
 const HIDE_DONE_MS = 30_000
-const FRAME_MS = 50
+// 30 frames a second, the band's redraw ceiling; animations count in 50ms ticks.
+const FRAME_MS = 33
 const THEME_POLL_MS = 3000
 
 type ProgressInput = {
@@ -264,16 +265,16 @@ export const register: Register = on => {
     $.clock.every(THEME_POLL_MS, () => void readTheme($).catch(() => undefined))
 
     $.clock.every(FRAME_MS, () => {
-      frame += 1
+      frame += FRAME_MS / 50
       for (const [id, bar] of mounted) {
         const target = progressOf(bar.plan)
         const from = shown.get(id) ?? 0
         let to: number
         if (bar.style === 'pixel') {
-          to = Math.abs(target - from) < 0.002 ? target : from + (target - from) * 0.18
+          to = Math.abs(target - from) < 0.002 ? target : from + (target - from) * 0.123
         } else {
-          // A spring, as Bubbles eases its bar: it overshoots a touch and settles.
-          const v = (velocity.get(id) ?? 0) * 0.68 + (target - from) * 0.1
+          // A near-critically damped spring: about 0.27s to settle, no visible bounce.
+          const v = (velocity.get(id) ?? 0) * 0.35 + (target - from) * 0.2
           const settled = Math.abs(target - from) < 0.002 && Math.abs(v) < 0.001
           to = settled ? target : Math.min(1, Math.max(0, from + v))
           velocity.set(id, settled ? 0 : v)

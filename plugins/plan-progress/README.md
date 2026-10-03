@@ -13,7 +13,7 @@ On Omarchy, running bars take the active theme's `accent` color (from `~/.local/
 
 ## Styles
 
-- `flow` (default): braille particles streaming toward the head, springy easing; solid green when done
+- `flow` (default): braille particles streaming toward the head, smooth spring easing; solid green when done
 - `comet`: the pill leads a glowing trail shedding sparks, stars ahead; solid green when done
 - `pixel`: a dithered, twinkling fill with a light passing through it
 
