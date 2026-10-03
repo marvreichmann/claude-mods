@@ -1,18 +1,20 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Plan, Stage, TaskItem, TaskList } from '../types'
-import { barCells, encode, isStyle, listPlan, progressOf, STYLES, totals } from './bar'
+import type { Plan, Stage, TaskItem, TaskList, ThemeColors } from '../types'
+import { barCells, encode, isStyle, listPlan, parseTheme, progressOf, runningHex, STYLES, totals, useTheme } from './bar'
 import type { BarStyle } from './bar'
 
 const plans = atom({ plugin: 'plan-progress', key: 'plans' } as const, {})
 const lists = atom({ plugin: 'plan-progress', key: 'lists' } as const, {})
 const muted = atom({ plugin: 'plan-progress', key: 'muted' } as const, false)
 const style = atom({ plugin: 'plan-progress', key: 'style' } as const, 'flow')
+const theme = atom({ plugin: 'plan-progress', key: 'theme' } as const, null)
 
 const TOOL = 'mcp__plan-progress__progress'
 const HIDE_DONE_MS = 30_000
 const FRAME_MS = 50
+const THEME_POLL_MS = 3000
 
 type ProgressInput = {
   plan: string
@@ -205,6 +207,16 @@ async function tryStyle($: EngineInterface, index: number, current: string) {
   })
 }
 
+/** Reads the Omarchy theme in use; its accent colors running bars, null keeps the default. */
+async function readTheme($: EngineInterface) {
+  const home = await $.env.get('HOME')
+  const state = (await $.env.get('XDG_STATE_HOME')) || (home && `${home}/.local/state`)
+  const toml = state ? await $.fs.read(`${state}/omarchy/current/theme/colors.toml`).catch(() => undefined) : undefined
+  const found: ThemeColors | null = (toml !== undefined && parseTheme(toml)) || null
+  const now = await read($, theme)
+  if (now?.accent !== found?.accent || now?.background !== found?.background) await update($, theme, () => found)
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.tool.register({
@@ -246,6 +258,10 @@ export const register: Register = on => {
     if (stored === true) await update($, muted, () => true)
     const saved = await $.store.get('style')
     if (typeof saved === 'string' && isStyle(saved)) await update($, style, () => saved)
+
+    // Follow the theme: read it now, and again every few seconds for a switch.
+    await readTheme($)
+    $.clock.every(THEME_POLL_MS, () => void readTheme($).catch(() => undefined))
 
     $.clock.every(FRAME_MS, () => {
       frame += 1
@@ -426,6 +442,7 @@ export const register: Register = on => {
 
     const { Box, Text, Button, Raster } = $.ui.resolve(e)
     const setting = await read($, style)
+    useTheme((await read($, theme)) ?? undefined)
     const styleOf = (plan: Plan): BarStyle =>
       plan.style !== undefined && isStyle(plan.style) ? plan.style : isStyle(setting) ? setting : 'flow'
     const inner = Math.max(20, e.props.bodyColumns - 4)
@@ -438,7 +455,7 @@ export const register: Register = on => {
         {rows.map(plan => {
           if (!shown.has(plan.id)) shown.set(plan.id, 0)
           mounted.set(plan.id, { requestId: e.requestId, width, plan, style: styleOf(plan) })
-          const color = plan.status === 'done' ? '#34b36f' : plan.status === 'failed' ? '#e05d5d' : '#8b7cf6'
+          const color = plan.status === 'done' ? '#34b36f' : plan.status === 'failed' ? '#e05d5d' : runningHex()
           return (
             <Box key={`row:${plan.id}`} flexDirection="row" gap={1}>
               <Text color={color}>{plan.status === 'done' ? '✓' : plan.status === 'failed' ? '✗' : '●'}</Text>

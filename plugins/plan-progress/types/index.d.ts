@@ -19,6 +19,9 @@ export type TaskItem = {
 
 export type TaskList = { title: string; items: TaskItem[] }
 
+/** The active Omarchy theme's colors, as 0xRRGGBB. */
+export type ThemeColors = { accent: number; background: number }
+
 declare module 'claude-code' {
   interface PluginState {
     'plan-progress': {
@@ -26,6 +29,7 @@ declare module 'claude-code' {
       lists: Record<string, TaskList>
       muted: boolean
       style: string
+      theme: ThemeColors | null
     }
   }
 }

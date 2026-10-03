@@ -1,16 +1,53 @@
 import type { Plan, TaskList } from '../types'
 
-type Palette = { fill: number; dot: number; hi: number; pill: number; tick: number }
+type Palette = { fill: number; dot: number; hi: number; pill: number; tick: number; text: number }
 
 const PALETTES: Record<Plan['status'], Palette> = {
-  active: { fill: 0x312b55, dot: 0x6a5fc4, hi: 0xb9afff, pill: 0x8b7cf6, tick: 0xd6d0ff },
-  done: { fill: 0x1d5338, dot: 0x3d9d68, hi: 0x8de8b3, pill: 0x34b36f, tick: 0xc8f5da },
-  failed: { fill: 0x552a2a, dot: 0xb85a5a, hi: 0xffa3a3, pill: 0xe05d5d, tick: 0xffd4d4 },
+  active: { fill: 0x312b55, dot: 0x6a5fc4, hi: 0xb9afff, pill: 0x8b7cf6, tick: 0xd6d0ff, text: 0xffffff },
+  done: { fill: 0x1d5338, dot: 0x3d9d68, hi: 0x8de8b3, pill: 0x34b36f, tick: 0xc8f5da, text: 0xffffff },
+  failed: { fill: 0x552a2a, dot: 0xb85a5a, hi: 0xffa3a3, pill: 0xe05d5d, tick: 0xffd4d4, text: 0xffffff },
 }
+// What a running bar is drawn in: the default purple, or one built from a theme's accent.
+let running: Palette = PALETTES.active
+
+export type Theme = { accent: number; background: number }
+
+/** The `accent` and `background` of an Omarchy colors.toml; undefined without an accent. */
+export const parseTheme = (toml: string): Theme | undefined => {
+  const color = (key: string) => {
+    const hex = new RegExp(`^\\s*${key}\\s*=\\s*["']#([0-9a-fA-F]{6})["']`, 'm').exec(toml)?.[1]
+    return hex === undefined ? undefined : parseInt(hex, 16)
+  }
+  const accent = color('accent')
+  return accent === undefined ? undefined : { accent, background: color('background') ?? 0x1b1b1b }
+}
+
+const luminance = (rgb: number): number =>
+  (0.2126 * ((rgb >> 16) & 255) + 0.7152 * ((rgb >> 8) & 255) + 0.0722 * (rgb & 255)) / 255
+
+/** Draws running bars from `theme`'s accent from now on, or the default purple without one. */
+export const useTheme = (theme: Theme | undefined): void => {
+  if (theme === undefined) {
+    running = PALETTES.active
+    return
+  }
+  const { accent, background } = theme
+  running = {
+    pill: accent,
+    fill: mix(background, accent, 0.28),
+    dot: mix(background, accent, 0.62),
+    hi: mix(accent, 0xffffff, 0.45),
+    tick: mix(accent, 0xffffff, 0.75),
+    // Dark text on a light accent (a yellow, a pastel), white on the rest.
+    text: luminance(accent) > 0.62 ? background : 0xffffff,
+  }
+}
+
+/** The running color as `#rrggbb`, for the row's status dot. */
+export const runningHex = (): string => `#${running.pill.toString(16).padStart(6, '0')}`
 const TRACK = 0x2a2a30
 const TRACK_TICK = 0x4c4c56
 const TRACK_MAJOR = 0x7a7a88
-const PILL_TEXT = 0xffffff
 // U+258F..U+2589: a left-anchored block one eighth to seven eighths wide.
 const EIGHTHS = [0, 0x258f, 0x258e, 0x258d, 0x258c, 0x258b, 0x258a, 0x2589]
 const DITHER = [0x2598, 0x259d, 0x2596, 0x2597, 0x259a, 0x259e, 0x2580, 0x2584, 0xb7]
@@ -122,7 +159,7 @@ const setup = (plan: Plan, width: number, shown: number): Cells => {
   }
   const head = Math.max(0, Math.min(1, shown)) * width
 
-  return { words, put, width, head, colors: PALETTES[plan.status], label, ticks }
+  return { words, put, width, head, colors: plan.status === 'active' ? running : PALETTES[plan.status], label, ticks }
 }
 
 /** Paints one fill cell at column `x`; `start` is where the pill begins. */
@@ -132,7 +169,7 @@ type Fill = (x: number, start: number) => void
  * The shared frame: a fill up to the stage pill riding the head, an
  * eighth-cell edge past it, and the track with its ticks beyond.
  */
-const headed = (c: Cells, fill: Fill, pill = c.colors.pill, pillText = PILL_TEXT, track = TRACK) => {
+const headed = (c: Cells, fill: Fill, pill = c.colors.pill, pillText = c.colors.text, track = TRACK) => {
   const { put, width, head, label, ticks } = c
   const pillWidth = Math.min(width, label.length + 2)
   const end = Math.min(width, Math.max(pillWidth, Math.floor(head)))

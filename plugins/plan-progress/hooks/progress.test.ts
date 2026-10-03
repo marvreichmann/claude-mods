@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { barCells, listPlan, pillText, progressOf, STYLES } from './bar'
+import { barCells, listPlan, parseTheme, pillText, progressOf, STYLES, useTheme } from './bar'
 import type { Plan } from '../types'
 
 const BAND = {
@@ -71,6 +71,23 @@ test('flow and comet finish as one solid color', () => {
       expect(words[x * 3 + 2]).toBe(words[(start + 1) * 3 + 2])
     }
   }
+})
+
+test('a running bar takes the Omarchy accent; done stays green', () => {
+  const theme = parseTheme('accent = "#e75a50"\nforeground = "#efebdc"\nbackground = "#1B1B1B"\n')
+  expect(theme).toEqual({ accent: 0xe75a50, background: 0x1b1b1b })
+  expect(parseTheme('foreground = "#ffffff"')).toBeUndefined()
+
+  const pillBg = (plan: Plan) => {
+    const words = barCells(plan, 60, progressOf(plan), 0)
+    const end = plan.status === 'done' ? 60 : Math.floor(progressOf(plan) * 60)
+    return words[(end - 2) * 3 + 2]
+  }
+  useTheme(theme)
+  expect(pillBg(release)).toBe(0xe75a50)
+  expect(pillBg({ ...release, status: 'done' })).toBe(0x34b36f)
+  useTheme(undefined)
+  expect(pillBg(release)).toBe(0x8b7cf6)
 })
 
 test('a todo list is a one-stage plan titled by what is in progress', () => {
