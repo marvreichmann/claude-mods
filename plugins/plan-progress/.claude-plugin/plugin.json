@@ -1,0 +1,6 @@
+{
+  "name": "plan-progress",
+  "version": "0.1.0",
+  "description": "Live progress bars above the prompt for task lists and multi-stage plans, with stage ticks and sounds",
+  "types": "./types/index.d.ts"
+}
