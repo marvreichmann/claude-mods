@@ -68,38 +68,50 @@ const noise =(a: number, b: number): number => {
   return ((x ^ (x >>> 16)) >>> 0) / 4294967296
 }
 
-/**
- * One row of Raster cells: a dithered fill up to `shown` (0..1), the stage
- * pill riding its head with a sub-cell edge, and stage and step ticks.
- */
-export const barCells = (plan: Plan, width: number, shown: number, frame: number): Uint32Array => {
+export const STYLES = ['flow', 'comet', 'pixel'] as const
+export type BarStyle = (typeof STYLES)[number]
+export const isStyle = (name: string): name is BarStyle => (STYLES as readonly string[]).includes(name)
+
+const mix = (a: number, b: number, t: number): number => {
+  const k = Math.max(0, Math.min(1, t))
+  const ch = (shift: number) => {
+    const x = (a >> shift) & 255
+    const y = (b >> shift) & 255
+    return Math.round(x + (y - x) * k) << shift
+  }
+  return ch(16) | ch(8) | ch(0)
+}
+
+type Cells = {
+  words: Uint32Array
+  put: (i: number, ch: number, fg: number, bg: number) => void
+  width: number
+  head: number
+  colors: Palette
+  label: string
+  ticks: Map<number, boolean>
+}
+
+const setup = (plan: Plan, width: number, shown: number): Cells => {
   const words = new Uint32Array(width * 3)
   const put = (i: number, ch: number, fg: number, bg: number) => {
+    if (i < 0 || i >= width) return
     words[i * 3] = ch
     words[i * 3 + 1] = fg
     words[i * 3 + 2] = bg
   }
-  const colors = PALETTES[plan.status]
-
   let label = narrow(pillText(plan))
   if (label.length + 2 > Math.floor(width * 0.6)) {
     const stage = plan.stages[plan.current]
     label = plan.status === 'done' ? '✓' : `${stage?.done ?? 0}/${stage?.total ?? 0}`
   }
-  const pillWidth = Math.min(width, label.length + 2)
-  const head = Math.max(0, Math.min(1, shown)) * width
-  const end = Math.min(width, Math.max(pillWidth, Math.floor(head)))
-  const start = end - pillWidth
-  const edge = Math.round((head - Math.floor(head)) * 8)
-
   // Stage boundaries (major) and step boundaries (minor), as cell columns.
   const ticks = new Map<number, boolean>()
   const total = plan.stages.reduce((n, s) => n + s.total, 0)
   if (total > 0) {
     let at = 0
     plan.stages.forEach((stage, index) => {
-      const cellsPerStep = width / total
-      if (cellsPerStep >= 4) {
+      if (width / total >= 4) {
         for (let step = 1; step < stage.total; step++) {
           ticks.set(Math.round(((at + step) / total) * width), false)
         }
@@ -108,40 +120,132 @@ export const barCells = (plan: Plan, width: number, shown: number, frame: number
       if (index < plan.stages.length - 1) ticks.set(Math.round((at / total) * width), true)
     })
   }
+  const head = Math.max(0, Math.min(1, shown)) * width
 
-  const twinkle = frame >> 2
-  const wave = start > 0 ? ((frame * 0.7) % (start + 16)) - 8 : -99
+  return { words, put, width, head, colors: PALETTES[plan.status], label, ticks }
+}
+
+/** Paints one fill cell at column `x`; `start` is where the pill begins. */
+type Fill = (x: number, start: number) => void
+
+/**
+ * The shared frame: a fill up to the stage pill riding the head, an
+ * eighth-cell edge past it, and the track with its ticks beyond.
+ */
+const headed = (c: Cells, fill: Fill, pill = c.colors.pill, pillText = PILL_TEXT, track = TRACK) => {
+  const { put, width, head, label, ticks } = c
+  const pillWidth = Math.min(width, label.length + 2)
+  const end = Math.min(width, Math.max(pillWidth, Math.floor(head)))
+  const start = end - pillWidth
+  const edge = Math.round((head - Math.floor(head)) * 8)
   for (let x = 0; x < width; x++) {
     if (x >= start && x < end) {
       const ch = label.codePointAt(x - start - 1)
-      put(x, x === start || ch === undefined ? 0x20 : ch, PILL_TEXT, colors.pill)
-      continue
+      put(x, x === start || ch === undefined ? 0x20 : ch, pillText, pill)
+    } else if (x < start) {
+      fill(x, start)
+    } else if (x === end && edge > 0 && head > end) {
+      put(x, EIGHTHS[Math.min(7, edge)]!, pill, track)
+    } else {
+      const major = ticks.get(x)
+      if (major === undefined) put(x, 0x20, track, track)
+      else put(x, major ? 0x2502 : 0x2575, major ? TRACK_MAJOR : TRACK_TICK, track)
     }
-    const major = ticks.get(x)
-    if (x < start) {
-      if (major !== undefined) {
-        put(x, major ? 0x2502 : 0x254e, major ? colors.tick : colors.dot, colors.fill)
-        continue
-      }
-      const density = 0.25 + 0.55 * (x / Math.max(1, start))
-      const r = noise(x, twinkle)
-      const lit = plan.status === 'active' && Math.abs(x - wave) < 2.5
-      const ch = r < density ? DITHER[Math.floor(noise(x + 7, twinkle) * DITHER.length)]! : 0x20
-      put(x, ch, lit ? colors.hi : colors.dot, colors.fill)
-      continue
-    }
-    if (x === end && edge > 0 && head > end) {
-      put(x, EIGHTHS[Math.min(7, edge)]!, colors.pill, TRACK)
-      continue
-    }
-    if (major !== undefined) {
-      put(x, major ? 0x2502 : 0x2575, major ? TRACK_MAJOR : TRACK_TICK, TRACK)
-      continue
-    }
-    put(x, 0x20, TRACK, TRACK)
   }
+  return { start, end }
+}
 
-  return words
+/** The original: a dithered, twinkling fill with a light passing through it. */
+const pixel = (plan: Plan, c: Cells, frame: number) => {
+  const { put, colors, ticks } = c
+  const twinkle = frame >> 2
+  headed(c, (x, start) => {
+    const major = ticks.get(x)
+    if (major !== undefined) {
+      put(x, major ? 0x2502 : 0x254e, major ? colors.tick : colors.dot, colors.fill)
+      return
+    }
+    const wave = ((frame * 0.7) % (start + 16)) - 8
+    const density = 0.25 + 0.55 * (x / Math.max(1, start))
+    const lit = plan.status === 'active' && Math.abs(x - wave) < 2.5
+    const ch = noise(x, twinkle) < density ? DITHER[Math.floor(noise(x + 7, twinkle) * DITHER.length)]! : 0x20
+    put(x, ch, lit ? colors.hi : colors.dot, colors.fill)
+  })
+}
+
+/** A finished bar in one solid color, the pill at its end. */
+const solid = (c: Cells) => headed(c, x => c.put(x, 0x20, c.colors.pill, c.colors.pill))
+
+/** Braille particles streaming toward the head, thickening as they go. */
+const flow = (plan: Plan, c: Cells, frame: number) => {
+  if (plan.status === 'done') return void solid(c)
+  const { put, colors } = c
+  const shift = Math.floor(frame * (plan.status === 'active' ? 0.8 : 0.15))
+  // Braille dot bits by [column][row] of the 2x4 cell.
+  const BITS = [
+    [0x01, 0x02, 0x04, 0x40],
+    [0x08, 0x10, 0x20, 0x80],
+  ]
+  headed(c, (x, start) => {
+    const near = x / Math.max(1, start)
+    const density = 0.12 + 0.5 * near * near
+    let bits = 0
+    for (let dx = 0; dx < 2; dx++) {
+      for (let dy = 0; dy < 4; dy++) {
+        if (noise(2 * x + dx - shift, dy * 977) < density) bits |= BITS[dx]![dy]!
+      }
+    }
+    put(x, 0x2800 + bits, mix(colors.dot, colors.hi, near), colors.fill)
+  })
+}
+
+// Glyphs every monospace font carries: no ✦ or ⋆, which many lack.
+const SPARKS = [0x2a, 0x2b, 0xb7, 0x2022, 0x2219]
+
+/** A comet: the pill its head, a trail of sparks shed behind it, stars ahead. */
+const comet = (plan: Plan, c: Cells, frame: number) => {
+  if (plan.status === 'done') return void solid(c)
+  const { put, width, colors } = c
+  const moving = plan.status === 'active'
+  const { end } = headed(c, (x, start) => {
+    const back = start - x
+    const glow = Math.max(0, 1 - back / Math.max(8, start * 0.6))
+    const bg = mix(colors.fill, mix(colors.fill, colors.pill, 0.55), glow * glow)
+    // Each spark drifts back from the head and fades, then is shed again.
+    const drift = moving ? Math.floor(frame * 0.5) : 0
+    const r = noise(x + drift, 41)
+    if (r < 0.18 + 0.5 * glow) {
+      const ch = SPARKS[Math.floor(noise(x + drift, 7) * SPARKS.length)]!
+      put(x, ch, mix(colors.dot, 0xffffff, glow * 0.8), bg)
+    } else {
+      put(x, 0x20, colors.dot, bg)
+    }
+  })
+  const twinkle = frame >> 3
+  for (let x = end + 1; x < width; x++) {
+    if (c.ticks.has(x)) continue
+    const r = noise(x, twinkle * 13)
+    if (r < 0.07) put(x, r < 0.02 ? 0x2b : 0xb7, r < 0.02 ? 0x8a84b8 : TRACK_TICK, TRACK)
+  }
+}
+
+const DRAW: Record<BarStyle, (plan: Plan, c: Cells, frame: number) => void> = {
+  pixel,
+  flow,
+  comet,
+}
+
+/** One row of Raster cells for `plan` at `shown` (0..1) in the given style. */
+export const barCells = (
+  plan: Plan,
+  width: number,
+  shown: number,
+  frame: number,
+  style: BarStyle = 'flow',
+): Uint32Array => {
+  const c = setup(plan, width, shown)
+  DRAW[style](plan, c, frame)
+  return c.words
 }
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'

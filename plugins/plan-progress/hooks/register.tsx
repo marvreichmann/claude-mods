@@ -2,11 +2,13 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Plan, Stage, TaskItem, TaskList } from '../types'
-import { barCells, encode, listPlan, progressOf, totals } from './bar'
+import { barCells, encode, isStyle, listPlan, progressOf, STYLES, totals } from './bar'
+import type { BarStyle } from './bar'
 
 const plans = atom({ plugin: 'plan-progress', key: 'plans' } as const, {})
 const lists = atom({ plugin: 'plan-progress', key: 'lists' } as const, {})
 const muted = atom({ plugin: 'plan-progress', key: 'muted' } as const, false)
+const style = atom({ plugin: 'plan-progress', key: 'style' } as const, 'flow')
 
 const TOOL = 'mcp__plan-progress__progress'
 const HIDE_DONE_MS = 30_000
@@ -22,12 +24,16 @@ type ProgressInput = {
   status?: 'active' | 'done' | 'failed' | 'remove'
 }
 
-type Mounted = { requestId: string; width: number; plan: Plan }
+type Mounted = { requestId: string; width: number; plan: Plan; style: BarStyle }
 
 // What each bar shows now, eased toward its plan's progress by the frame timer.
 const shown = new Map<string, number>()
+const velocity = new Map<string, number>()
 const mounted = new Map<string, Mounted>()
 let frame = 0
+// The style preview running now, and which style `/progress try` showed last.
+let preview: { cancel: () => void } | undefined
+let tried = -1
 let player: string[] | null | undefined
 
 async function play($: EngineInterface, name: 'tick' | 'done') {
@@ -67,7 +73,8 @@ async function remove($: EngineInterface, id: string) {
 
 // Sounds on a stage step or a finish; a finished bar leaves after a while.
 async function changed($: EngineInterface, before: Plan | undefined, after: Plan | undefined) {
-  if (after === undefined) return
+  // Style previews stay quiet: six bars ticking at once would only be noise.
+  if (after === undefined || after.style !== undefined) return
   if (after.status === 'done' && before?.status !== 'done') {
     void play($, 'done')
     $.clock.after(HIDE_DONE_MS, () => {
@@ -163,6 +170,41 @@ async function applyProgress($: EngineInterface, input: ProgressInput): Promise<
     : `${after.title}: ${after.status}.`
 }
 
+async function startPreview($: EngineInterface, index: number, current: string) {
+  const name = STYLES[index]!
+  await applyProgress($, {
+    plan: `style-${name}`,
+    title: `${index + 1}/${STYLES.length} ${name}${name === current ? ' (current)' : ''}`,
+    stages: [{ name: 'Build', steps: 2 }, { name: 'Test', steps: 3 }, { name: 'Deploy', steps: 2 }],
+  })
+  await update($, plans, all => {
+    const plan = all[`plan:style-${name}`]
+    return plan ? { ...all, [plan.id]: { ...plan, style: name } } : all
+  })
+}
+
+async function tryStyle($: EngineInterface, index: number, current: string) {
+  preview?.cancel()
+  for (const name of STYLES) await remove($, `plan:style-${name}`)
+  tried = index
+  await startPreview($, index, current)
+  const name = STYLES[index]!
+  let held = 0
+  // Fill, hold on Done, start over: until another style is tried or the preview stops.
+  preview = $.clock.every(700, () => {
+    void (async () => {
+      const plan = (await read($, plans))[`plan:style-${name}`]
+      if (plan === undefined) return preview?.cancel()
+      if (plan.status !== 'done') return void (await applyProgress($, { plan: `style-${name}`, advance: true }))
+      held += 1
+      if (held < 4) return
+      held = 0
+      await remove($, `plan:style-${name}`)
+      await startPreview($, index, current)
+    })().catch(() => undefined)
+  })
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.tool.register({
@@ -198,20 +240,31 @@ export const register: Register = on => {
     })
     await $.command.register({
       name: 'progress',
-      description: 'Progress bars: /progress demo | clear | mute | unmute',
+      description: 'Progress bars: /progress demo | styles | try [name|stop] | style <name> | clear | mute | unmute',
     })
     const stored = await $.store.get('muted')
     if (stored === true) await update($, muted, () => true)
+    const saved = await $.store.get('style')
+    if (typeof saved === 'string' && isStyle(saved)) await update($, style, () => saved)
 
     $.clock.every(FRAME_MS, () => {
       frame += 1
       for (const [id, bar] of mounted) {
         const target = progressOf(bar.plan)
         const from = shown.get(id) ?? 0
-        const to = Math.abs(target - from) < 0.002 ? target : from + (target - from) * 0.18
+        let to: number
+        if (bar.style === 'pixel') {
+          to = Math.abs(target - from) < 0.002 ? target : from + (target - from) * 0.18
+        } else {
+          // A spring, as Bubbles eases its bar: it overshoots a touch and settles.
+          const v = (velocity.get(id) ?? 0) * 0.68 + (target - from) * 0.1
+          const settled = Math.abs(target - from) < 0.002 && Math.abs(v) < 0.001
+          to = settled ? target : Math.min(1, Math.max(0, from + v))
+          velocity.set(id, settled ? 0 : v)
+        }
         shown.set(id, to)
         if (to === from && bar.plan.status !== 'active') continue
-        const cells = encode(barCells(bar.plan, bar.width, to, frame))
+        const cells = encode(barCells(bar.plan, bar.width, to, frame, bar.style))
         void $.ui.blit({ requestId: bar.requestId, key: `bar:${id}`, columns: bar.width, rows: 1, cells })
           .catch(() => undefined)
       }
@@ -304,7 +357,62 @@ export const register: Register = on => {
       })
       return { text: 'Running two demo plans.' }
     }
-    return { text: 'Usage: /progress demo | clear | mute | unmute' }
+    if (arg === 'try' || arg.startsWith('try ')) {
+      const want = arg.slice('try'.length).trim()
+      const current = await read($, style)
+      if (want === 'stop') {
+        preview?.cancel()
+        preview = undefined
+        for (const name of STYLES) await remove($, `plan:style-${name}`)
+        return { text: 'Style preview stopped.' }
+      }
+      if (want !== '' && !isStyle(want)) return { text: `Styles: ${STYLES.join(', ')}` }
+      const index = want === '' ? (tried + 1) % STYLES.length : STYLES.indexOf(want as BarStyle)
+      await tryStyle($, index, current)
+      const following = STYLES[(index + 1) % STYLES.length]
+      return {
+        text: `Showing ${STYLES[index]} (${index + 1}/${STYLES.length}). /progress try for ${following}, /progress style ${STYLES[index]} to keep it, /progress try stop to end.`,
+      }
+    }
+    if (arg === 'styles') {
+      preview?.cancel()
+      const current = await read($, style)
+      for (const name of STYLES) await remove($, `plan:style-${name}`)
+      // One style at a time: run it from empty to Done, hold, then the next.
+      let index = 0
+      let held = 0
+      await startPreview($, index, current)
+      const timer = $.clock.every(700, () => {
+        void (async () => {
+          const name = STYLES[index]!
+          const plan = (await read($, plans))[`plan:style-${name}`]
+          if (plan !== undefined && plan.status !== 'done') {
+            await applyProgress($, { plan: `style-${name}`, advance: true })
+            return
+          }
+          held += 1
+          if (held < 3) return
+          held = 0
+          await remove($, `plan:style-${name}`)
+          index += 1
+          if (index >= STYLES.length) {
+            timer.cancel()
+            return
+          }
+          await startPreview($, index, current)
+        })().catch(() => undefined)
+      })
+      preview = timer
+      return { text: `Previewing ${STYLES.length} styles one after the other. Pick one with /progress style <name>.` }
+    }
+    if (arg.startsWith('style')) {
+      const name = arg.slice('style'.length).trim()
+      if (!isStyle(name)) return { text: `Styles: ${STYLES.join(', ')}` }
+      await update($, style, () => name)
+      await $.store.set('style', name)
+      return { text: `Progress bars now use the ${name} style.` }
+    }
+    return { text: 'Usage: /progress demo | styles | try [name|stop] | style <name> | clear | mute | unmute' }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -317,6 +425,9 @@ export const register: Register = on => {
     if (e.surface !== 'terminal' || e.props.hasSurvey || views.length === 0) return next(e)
 
     const { Box, Text, Button, Raster } = $.ui.resolve(e)
+    const setting = await read($, style)
+    const styleOf = (plan: Plan): BarStyle =>
+      plan.style !== undefined && isStyle(plan.style) ? plan.style : isStyle(setting) ? setting : 'flow'
     const inner = Math.max(20, e.props.bodyColumns - 4)
     const titleWidth = Math.max(10, Math.min(32, Math.floor(inner * 0.26)))
     const width = Math.max(8, inner - titleWidth - 10)
@@ -326,7 +437,7 @@ export const register: Register = on => {
       <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1}>
         {rows.map(plan => {
           if (!shown.has(plan.id)) shown.set(plan.id, 0)
-          mounted.set(plan.id, { requestId: e.requestId, width, plan })
+          mounted.set(plan.id, { requestId: e.requestId, width, plan, style: styleOf(plan) })
           const color = plan.status === 'done' ? '#34b36f' : plan.status === 'failed' ? '#e05d5d' : '#8b7cf6'
           return (
             <Box key={`row:${plan.id}`} flexDirection="row" gap={1}>
@@ -338,7 +449,7 @@ export const register: Register = on => {
                 key={`bar:${plan.id}`}
                 columns={width}
                 rows={1}
-                cells={encode(barCells(plan, width, shown.get(plan.id) ?? 0, frame))}
+                cells={encode(barCells(plan, width, shown.get(plan.id) ?? 0, frame, styleOf(plan)))}
               />
               <Box width={4} justifyContent="flex-end">
                 <Text dimColor>{`${Math.round(progressOf(plan) * 100)}%`}</Text>

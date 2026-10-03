@@ -6,6 +6,8 @@ export type Plan = {
   stages: Stage[]
   current: number
   status: 'active' | 'done' | 'failed'
+  /** A bar style drawn for this plan alone (the style preview); else the setting. */
+  style?: string
 }
 
 export type TaskItem = {
@@ -23,6 +25,7 @@ declare module 'claude-code' {
       plans: Record<string, Plan>
       lists: Record<string, TaskList>
       muted: boolean
+      style: string
     }
   }
 }

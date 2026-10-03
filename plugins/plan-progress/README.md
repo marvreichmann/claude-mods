@@ -1,6 +1,6 @@
 # plan-progress
 
-A Claude Code mod that draws live progress bars above the prompt in the terminal: a dithered, shimmering fill, a stage pill riding the head with sub-cell movement, stage and step tick marks, green "Done" and red "failed" states, and sounds on each step and at the finish.
+A Claude Code mod that draws live progress bars above the prompt in the terminal: an animated fill, a stage pill riding the head with sub-cell movement, stage and step tick marks, green "Done" and red "failed" states, and sounds on each step and at the finish.
 
 Bars come from two places:
 
@@ -9,9 +9,18 @@ Bars come from two places:
 
 Finished bars leave after 30 seconds; `×` dismisses one.
 
+## Styles
+
+- `flow` (default): braille particles streaming toward the head, springy easing; solid green when done
+- `comet`: the pill leads a glowing trail shedding sparks, stars ahead; solid green when done
+- `pixel`: a dithered, twinkling fill with a light passing through it
+
 ## Commands
 
 - `/progress demo`: two demo plans
+- `/progress style <name>`: pick a style (remembered)
+- `/progress try [name|stop]`: loop one style; again for the next
+- `/progress styles`: play every style once, one after the other
 - `/progress clear`: remove all bars
 - `/progress mute` / `/progress unmute`: sounds off / on (remembered)
 

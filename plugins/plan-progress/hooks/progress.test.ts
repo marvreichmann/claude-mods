@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { barCells, listPlan, pillText, progressOf } from './bar'
+import { barCells, listPlan, pillText, progressOf, STYLES } from './bar'
 import type { Plan } from '../types'
 
 const BAND = {
@@ -44,6 +44,33 @@ test('the pill rides the head of the fill', () => {
   // Past the head, the empty track carries the Deploy stage boundary.
   const deployTick = Math.round((7 / 9) * width)
   expect(words[deployTick * 3]).toBe(0x2502)
+})
+
+test('every style draws only printable cells, at every state and frame', () => {
+  for (const style of STYLES) {
+    for (const status of ['active', 'done', 'failed'] as const) {
+      for (const [shown, frame] of [[0, 0], [0.31, 17], [5 / 9, 400], [1, 9999]] as const) {
+        const words = barCells({ ...release, status }, 48, shown, frame, style)
+        for (let i = 0; i < 48; i++) {
+          const code = words[i * 3]!
+          expect(code >= 0x20 && code <= 0xffff && (code < 0x7f || code > 0x9f)).toBe(true)
+          expect(words[i * 3 + 1]! <= 0x01ffffff && words[i * 3 + 2]! <= 0x01ffffff).toBe(true)
+        }
+      }
+    }
+  }
+})
+
+test('flow and comet finish as one solid color', () => {
+  for (const style of ['flow', 'comet'] as const) {
+    const words = barCells({ ...release, status: 'done' }, 48, 1, 123, style)
+    const label = '✓ Done 9/9'
+    const start = 48 - (label.length + 2)
+    for (let x = 0; x < start; x++) {
+      expect(words[x * 3]).toBe(0x20)
+      expect(words[x * 3 + 2]).toBe(words[(start + 1) * 3 + 2])
+    }
+  }
 })
 
 test('a todo list is a one-stage plan titled by what is in progress', () => {
