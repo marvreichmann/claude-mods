@@ -294,22 +294,28 @@ const ripple = (plan: Plan, c: Cells, frame: number) => {
 const solid = (c: Cells) => headed(c, x => c.put(x, 0x20, c.colors.pill, c.colors.pill))
 
 /** Braille particles streaming toward the head, thickening as they go. */
+// Flow's rows, in dots per 50ms: around the old common pace of 0.55, out of step by a quarter.
+const FLOW_ROWS = [
+  { speed: 0.46, phase: 0 },
+  { speed: 0.6, phase: 0.25 },
+  { speed: 0.52, phase: 0.5 },
+  { speed: 0.66, phase: 0.75 },
+]
+
 const flow = (plan: Plan, c: Cells, frame: number) => {
   if (plan.status === 'done') return void solid(c)
   const { put, colors } = c
-  const shift = Math.floor(frame * (plan.status === 'active' ? 0.55 : 0.15))
-  // Braille dot bits by [column][row] of the 2x4 cell.
-  const BITS = [
-    [0x01, 0x02, 0x04, 0x40],
-    [0x08, 0x10, 0x20, 0x80],
-  ]
+  // Each dot row drifts at its own speed and steps at its own moments: the field
+  // never jumps all at once, so it reads as a steady stream rather than a tick.
+  const pace = plan.status === 'active' ? 1 : 0.27
+  const shifts = FLOW_ROWS.map(({ speed, phase }) => Math.floor(frame * speed * pace + phase))
   headed(c, (x, start) => {
     const near = x / Math.max(1, start)
     const density = 0.12 + 0.5 * near * near
     let bits = 0
     for (let dx = 0; dx < 2; dx++) {
       for (let dy = 0; dy < 4; dy++) {
-        if (noise(2 * x + dx - shift, dy * 977) < density) bits |= BITS[dx]![dy]!
+        if (noise(2 * x + dx - shifts[dy]!, dy * 977) < density) bits |= BRAILLE[dx]![dy]!
       }
     }
     put(x, 0x2800 + bits, mix(colors.dot, colors.hi, near), colors.fill)
