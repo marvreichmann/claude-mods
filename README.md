@@ -27,7 +27,7 @@ Safe fork of [zycck/claude-mods](https://github.com/zycck/claude-mods) at plan-p
 
 Live progress bars above the Claude Code prompt. Claude breaks medium and large tasks into stages and steps, and you watch them fill in real time, with the subagents working on each task right under its bar.
 
-![plan-progress: two tasks fill their bars with their agents under them, one turns amber while it waits for approval, both finish green](media/plan-progress.gif)
+![plan-progress in the Claude Code terminal: two task bars above the prompt fill in, one turns amber while Claude waits for approval, both finish green](media/plan-progress.gif)
 
 [Watch as MP4 (9 s)](media/plan-progress.mp4)
 
