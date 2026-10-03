@@ -59,7 +59,6 @@ let TRACK_TICK = DEFAULT_TRACK.tick
 let TRACK_MAJOR = DEFAULT_TRACK.major
 // U+258F..U+2589: a left-anchored block one eighth to seven eighths wide.
 const EIGHTHS = [0, 0x258f, 0x258e, 0x258d, 0x258c, 0x258b, 0x258a, 0x2589]
-const DITHER = [0x2598, 0x259d, 0x2596, 0x2597, 0x259a, 0x259e, 0x2580, 0x2584, 0xb7]
 
 export const progressOf = (plan: Plan): number => {
   if (plan.status === 'done') return 1
@@ -201,22 +200,46 @@ const headed = (c: Cells, fill: Fill, pill = c.colors.pill, pillText = c.colors.
   return { start, end }
 }
 
-/** The original: a dithered, twinkling fill with a light passing through it. */
+// GitHub's own contribution greens, dark mode, for a finished bar.
+const GITHUB_GREENS = [0x0e4429, 0x006d32, 0x26a641, 0x39d353]
+// The small square: in JetBrains Mono and most fonts the full one (■) fills its cell and runs together.
+const SQUARE = 0x25aa
+const TERMINAL_BG = 0x01000000
+
+/**
+ * GitHub's contribution graph: a row of squares in four levels of the accent,
+ * brighter and busier toward the head, each lighting up and fading on its own
+ * time; dim empty squares ahead, a gap where one stage ends and the next begins.
+ */
 const pixel = (plan: Plan, c: Cells, frame: number) => {
-  const { put, colors, ticks } = c
-  const twinkle = frame >> 2
-  headed(c, (x, start) => {
-    const major = ticks.get(x)
-    if (major !== undefined) {
-      put(x, major ? 0x2502 : 0x254e, major ? colors.tick : colors.dot, colors.fill)
-      return
-    }
-    const wave = ((frame * 0.7) % (start + 16)) - 8
-    const density = 0.25 + 0.55 * (x / Math.max(1, start))
-    const lit = plan.status === 'active' && Math.abs(x - wave) < 2.5
-    const ch = noise(x, twinkle) < density ? DITHER[Math.floor(noise(x + 7, twinkle) * DITHER.length)]! : 0x20
-    put(x, ch, lit ? colors.hi : colors.dot, colors.fill)
-  })
+  const { put, width, colors, ticks } = c
+  const levels =
+    plan.status === 'done'
+      ? GITHUB_GREENS
+      : [mix(TRACK, colors.pill, 0.45), mix(TRACK, colors.pill, 0.7), colors.pill, colors.hi]
+  const empty = mix(TRACK, TRACK_TICK, 0.5)
+  const moving = plan.status === 'active'
+  const { end } = headed(
+    c,
+    (x, start) => {
+      if (ticks.get(x)) return put(x, 0x20, TERMINAL_BG, TERMINAL_BG)
+      // Each square keeps its level for a while, then re-rolls: offsets keep them out of step.
+      const epoch = moving ? Math.floor((frame + noise(x, 3) * 40) / 40) : 0
+      const near = x / Math.max(1, start)
+      const r = noise(x, epoch * 31 + 5)
+      const busy = plan.status === 'done' ? 1 : 0.65 + 0.35 * near
+      if (r > busy) return put(x, SQUARE, empty, TERMINAL_BG)
+      const level = Math.min(3, Math.floor(noise(x + 11, epoch * 17) * (1.6 + 2.6 * near)))
+      put(x, SQUARE, levels[level]!, TERMINAL_BG)
+    },
+    undefined,
+    undefined,
+    TERMINAL_BG,
+  )
+  // Ahead of the head: empty squares, a gap at each stage's end.
+  for (let x = end; x < width; x++) {
+    put(x, ticks.get(x) ? 0x20 : SQUARE, empty, TERMINAL_BG)
+  }
 }
 
 /** A finished bar in one solid color, the pill at its end. */

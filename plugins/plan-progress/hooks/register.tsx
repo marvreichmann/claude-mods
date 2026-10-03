@@ -20,7 +20,7 @@ const PICKER = 'progress-style'
 const ABOUT: Record<BarStyle, string> = {
   flow: 'particles streaming toward the head',
   comet: 'a trail of sparks behind the head',
-  pixel: 'a dithered, twinkling fill',
+  pixel: 'a GitHub-style contribution graph',
 }
 // The sample each picker row animates: two stages, partway through the second.
 const SAMPLE: Plan = {

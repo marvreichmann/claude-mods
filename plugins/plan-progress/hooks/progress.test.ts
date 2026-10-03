@@ -144,7 +144,7 @@ test('the style picker lists every style and keeps the one pressed', async ($, o
     props: { title: 'Progress bar style', isFocused: true, bodyColumns: 100, placement: 'inline', scroll: { offset: 0, bodyRows: 8 } },
   } as never)
   for (const name of STYLES) expect(await ui.find({ key: `style:${name}` })).toBeDefined()
-  expect(await ui.find({ key: 'bar:sample-flow' })).toBeDefined()
+  for (const name of STYLES) expect(await ui.find({ key: `bar:sample-${name}` })).toBeDefined()
 
   await ui.press({ key: 'style:comet' })
   expect(closed).toEqual(['progress-style'])
