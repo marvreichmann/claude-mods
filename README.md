@@ -71,4 +71,4 @@ Built with Claude Code mods (function hooks). The bar looks best in the desktop 
 
 ## License
 
-MIT. plan-progress: [LICENSE](LICENSE). clickable-links: [its LICENSE](plugins/clickable-links/LICENSE).
+MIT, see [LICENSE](LICENSE). plan-progress keeps the original author's notice in [its own LICENSE](plugins/plan-progress/LICENSE).
