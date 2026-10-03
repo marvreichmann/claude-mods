@@ -39,7 +39,7 @@ In Claude Code:
 
 ## Demo clip
 
-`media/clickable-links.gif` and `.mp4` are rendered from `media/src/clickable-links/demo.html`, a mock-up of the terminal, with `node media/src/clickable-links/render.mjs` (needs Chromium and ffmpeg).
+`media/clickable-links.gif` and `.mp4` are rendered from `media/src/clickable-links/demo.html`, a mock-up of the terminal, with `node media/src/render.mjs clickable-links` (needs Chromium and ffmpeg).
 
 ## Tests
 

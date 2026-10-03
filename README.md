@@ -27,9 +27,9 @@ Safe fork of [zycck/claude-mods](https://github.com/zycck/claude-mods) at plan-p
 
 Live progress bars above the Claude Code prompt. Claude breaks medium and large tasks into stages and steps, and you watch them fill in real time, with the subagents working on each task right under its bar.
 
-![plan-progress: two tasks with their agents, a question, an error, a plan rewritten mid-run, both tasks done](media/plan-progress.gif)
+![plan-progress: two tasks fill their bars with their agents under them, one turns amber while it waits for approval, both finish green](media/plan-progress.gif)
 
-[Watch with sound (MP4, 14 s)](media/plan-progress.mp4)
+[Watch as MP4 (9 s)](media/plan-progress.mp4)
 
 - One thin row per task: state, title, pixel bar, percent, close button
 - A pill on the bar shows the current stage and step count; hover it to see how long the plan has run
@@ -72,6 +72,10 @@ Built with Claude Code mods (function hooks). The bar looks best in the desktop 
 ### Tests
 
 `plugins/plan-progress/tests` drives the real module through its hooks with a stub engine: `node compile.cjs ../hooks/register.tsx register.mjs`, then `node regress.mjs` and `node scenarios.mjs`. See its README.
+
+## Demo clips
+
+The clips in `media/` are HTML/CSS mock-ups, rendered frame by frame from `media/src/<name>/demo.html` with `node media/src/render.mjs <name>` (needs Node 22+, Chromium and ffmpeg).
 
 ## License
 

@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plan Progress demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400&display=block" rel="stylesheet">
+<style>
+  /* An 8.6 s clip in the style of the clickable-links one. Unlike that scene,
+     this one is drawn by render(t) below: clocks, percents and labels change
+     as text, which CSS animations cannot do. */
+  :root {
+    --violet: #7858CA;
+    --amber: #AD6400;
+    --red: #C5353E;
+    --green: #18883A;
+    --panel: #1F1E1D;
+    --window: #262624;
+    --edge: #3a3936;
+    --text: #ECEAE4;
+    --dim: #A8A69E;
+    --faint: #6f6d67;
+    --accent: #d97757;
+    --sans: 'Inter', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; }
+  body {
+    background: radial-gradient(circle at 30% 20%, #3a2a6e 0%, transparent 55%),
+                radial-gradient(circle at 80% 90%, #5a2a3e 0%, transparent 50%),
+                linear-gradient(160deg, #1b1530, #0d0b18);
+    font-family: var(--sans);
+    color: var(--text);
+    position: relative;
+  }
+
+  .headline {
+    position: absolute; top: 34px; left: 0; right: 0;
+    text-align: center; font-size: 34px; font-weight: 800; letter-spacing: -0.02em;
+    opacity: 0;
+  }
+  .headline em { font-style: normal; color: var(--accent); }
+
+  .app {
+    position: absolute; left: 110px; top: 112px; width: 1060px; height: 540px;
+    background: var(--window); border: 1px solid var(--edge); border-radius: 14px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.55); overflow: hidden;
+  }
+  .bar {
+    height: 40px; border-bottom: 1px solid var(--edge);
+    display: flex; align-items: center; gap: 8px; padding: 0 16px;
+    font-size: 14px; color: var(--dim);
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: #45433f; }
+  .bar span { margin-left: 12px; }
+
+  .tasks { margin: 18px 20px 0; background: var(--panel); border-radius: 12px; padding: 6px 18px; }
+  .task + .task { border-top: 1px solid var(--edge); }
+  .task { padding: 12px 0; }
+  .head { display: grid; grid-template-columns: 215px 1fr 70px 26px; align-items: center; height: 36px; }
+  .name { font-size: 22px; font-weight: 500; display: flex; gap: 10px; align-items: center; }
+  .glyph { width: 14px; text-align: center; font-weight: 800; }
+  .track { position: relative; height: 32px; border-radius: 16px; background: #2c2b29; overflow: hidden; }
+  .track canvas { position: absolute; inset: 0; }
+  .pill {
+    position: absolute; top: 0; height: 32px; border-radius: 16px; padding: 0 18px;
+    display: flex; align-items: center; font-size: 18px; font-weight: 600; color: #fff; white-space: nowrap;
+  }
+  .pct { text-align: right; font-size: 19px; color: var(--dim); }
+  .x { text-align: right; font-size: 16px; color: var(--dim); }
+
+  .strips { margin: 8px 96px 0 140px; display: flex; flex-direction: column; gap: 6px; }
+  .strip { display: grid; grid-template-columns: 75px 1fr; align-items: center; height: 32px; font-size: 17px; }
+  .num { color: var(--dim); display: flex; gap: 6px; align-items: center; }
+  .num svg { width: 17px; height: 17px; }
+  .lane {
+    height: 32px; border-radius: 16px; display: grid; grid-template-columns: 16px auto 1fr 52px;
+    align-items: center; padding: 0 14px 0 12px; gap: 8px;
+  }
+  .sdot { width: 8px; height: 8px; border-radius: 50%; }
+  .model { color: var(--dim); }
+  .tool { color: #a58ff0; padding-left: 28px; }
+  .clock { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+  .prompt {
+    position: absolute; left: 20px; right: 20px; bottom: 54px; height: 54px;
+    border: 1px solid var(--edge); border-radius: 12px; background: #2a2927;
+    display: flex; align-items: center; padding: 0 18px; font-size: 18px; color: var(--faint);
+  }
+  .prompt i { margin-left: auto; width: 18px; height: 18px; border: 2px solid var(--dim); border-radius: 50%; position: relative; }
+  .prompt i::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--dim); }
+  .footer {
+    position: absolute; left: 30px; right: 30px; bottom: 16px; display: flex; gap: 22px;
+    font-size: 16px; color: var(--dim); align-items: center;
+  }
+  .footer .right { margin-left: auto; display: flex; gap: 22px; color: var(--text); }
+  .chipbtn { background: #34332f; border-radius: 6px; padding: 2px 8px; color: var(--dim); }
+
+  .end {
+    position: absolute; inset: 0; z-index: 10;
+    background: linear-gradient(160deg, rgba(27,21,48,.97), rgba(13,11,24,.98));
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    opacity: 0;
+  }
+  .end h2 { font-size: 64px; font-weight: 800; letter-spacing: -0.03em; }
+  .end h2 em { font-style: normal; color: var(--accent); }
+  .end p { font-size: 24px; color: #c9c4d8; }
+  .chip {
+    margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-size: 20px;
+    background: #231f33; border: 1px solid #2c2840; border-radius: 10px; padding: 12px 22px;
+  }
+  .chip b { color: var(--accent); font-weight: 400; }
+</style>
+</head>
+<body>
+  <div class="headline" id="h0">Watch Claude's plan <em>fill in</em></div>
+  <div class="headline" id="h1">Every subagent, <em>live</em></div>
+  <div class="headline" id="h2">Amber when it <em>needs you</em></div>
+  <div class="headline" id="h3">Green when it's <em>done</em></div>
+
+  <div class="app" id="app">
+    <div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>Claude — checkout-service</span></div>
+    <div class="tasks" id="tasks"></div>
+    <div class="prompt">Type / for commands<i></i></div>
+    <div class="footer">
+      <span>+</span><span>Auto</span>
+      <div class="right"><span class="chipbtn">Progress</span><span>Opus 5.5</span><span>Medium</span></div>
+    </div>
+  </div>
+
+  <div class="end" id="end">
+    <h2>Plan <em>Progress</em></h2>
+    <p>Live progress bars above the Claude Code prompt.</p>
+    <div class="chip"><b>/plugin install</b> plan-progress@reichmann-mods</div>
+  </div>
+
+<script>
+  window.DURATION = 8.6
+
+  const COLOR = { running: '#7858CA', needs: '#AD6400', done: '#18883A' }
+  const RGB = { running: [120, 88, 202], needs: [173, 100, 0], done: [24, 136, 58] }
+  const GLYPH = { running: '●', needs: '?', done: '✓' }
+  const LANE = { running: 'rgba(120,88,202,.22)', needs: 'rgba(173,100,0,.28)', done: 'rgba(24,136,58,.22)' }
+  // Agent clocks run four times faster than the clip, so their numbers look like real work.
+  const PACE = 4
+
+  // Each task: its stages, when each step finishes, and its agents' lives.
+  const TASKS = [
+    {
+      title: 'Checkout flow', shownAt: 0.4, startsAt: 0.5,
+      stages: [['Explore', 2], ['Build', 3], ['Verify', 2]],
+      stepsDoneAt: [1.6, 2.4, 3.2, 5.0, 5.4, 5.8, 6.2],
+      needsInput: [3.6, 4.8],
+      agents: [
+        { name: 'Map payment routes', model: 'haiku 4.5', from: 0.7, to: 1.6, tools: [[0.7, 'Glob'], [1.2, 'Read']] },
+        { name: 'Read cart store', model: 'sonnet 5.5 · medium', from: 0.8, to: 2.4, tools: [[0.8, 'Read']] },
+        { name: 'Scan checkout tests', model: 'haiku 4.5', from: 2.5, to: 6.0, tools: [[2.5, 'Grep'], [3.2, 'Bash']], waits: [3.6, 4.8] },
+      ],
+    },
+    {
+      title: 'Release notes', shownAt: 2.3, startsAt: 2.4,
+      stages: [['Collect', 2], ['Draft', 2]],
+      stepsDoneAt: [3.2, 3.9, 5.0, 6.0],
+      agents: [
+        { name: 'Collect merged PRs', model: 'haiku 4.5', from: 2.5, to: 3.2, tools: [[2.5, 'Grep']] },
+        { name: 'Find breaking changes', model: 'haiku 4.5', from: 2.6, to: 3.9, tools: [[2.6, 'Read']] },
+        { name: 'Draft release notes', model: 'sonnet 5.5 · medium', from: 4.0, to: 5.8, tools: [[4.0, 'Write']] },
+      ],
+    },
+  ]
+  const HEADLINES = [[0.1, 2.3], [2.4, 3.5], [3.6, 4.9], [5.0, 6.7]]
+  const END_AT = 6.9
+
+  const clamp = (x, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, x))
+  const ease = x => 1 - Math.pow(1 - clamp(x), 3)
+  const fade = (t, from, to, edge = 0.2) => clamp(Math.min((t - from) / edge, (to - t) / edge))
+
+  // A fixed speckle per bar, so every frame and every run draws the same pixels.
+  const seeded = seed => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296)
+  const ROBOT = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.5" y="5" width="11" height="8" rx="2"/><path d="M8 2.5V5M6 9h.01M10 9h.01"/></svg>'
+
+  const tasksEl = document.getElementById('tasks')
+  for (const task of TASKS) {
+    task.el = document.createElement('div')
+    task.el.className = 'task'
+    task.el.innerHTML = `
+      <div class="head">
+        <span class="name"><span class="glyph"></span>${task.title}</span>
+        <div class="track"><canvas></canvas><div class="pill"></div></div>
+        <span class="pct"></span><span class="x">✕</span>
+      </div>
+      <div class="strips">${task.agents.map((agent, i) => `
+        <div class="strip"><span class="num">${ROBOT}${i + 1}</span>
+          <div class="lane"><i class="sdot"></i><span>${agent.name} <span class="model">(${agent.model})</span></span>
+          <span class="tool"></span><span class="clock"></span></div></div>`).join('')}
+      </div>`
+    tasksEl.append(task.el)
+    const random = seeded(task.title.length * 7919)
+    task.speckle = Array.from({ length: 400 }, () => Array.from({ length: 7 }, () => random()))
+    task.total = task.stages.reduce((sum, [, n]) => sum + n, 0)
+  }
+
+  const drawBar = (task, fill, state) => {
+    const canvas = task.el.querySelector('canvas')
+    const { width, height } = canvas
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, width, height)
+    const [r, g, b] = RGB[state]
+    const head = fill * width
+    const cell = 4
+    for (let x = 0; x * cell < head; x++) {
+      for (let y = 0; y * cell < height; y++) {
+        const v = task.speckle[x % 400][y % 7]
+        const alpha = state === 'done' ? 0.45 + v * 0.5 : 0.35 + v * 0.6
+        const light = v > 0.9 ? 0.55 : v > 0.75 ? 0.2 : 0
+        ctx.fillStyle = `rgba(${r + (255 - r) * light},${g + (255 - g) * light},${b + (255 - b) * light},${alpha})`
+        ctx.fillRect(x * cell, y * cell + 1, cell - 1, cell - 1)
+      }
+    }
+    // checkpoints: a dot per step, a capsule per stage boundary
+    let step = 0
+    for (const [, n] of task.stages) {
+      for (let i = 1; i <= n; i++) {
+        step++
+        if (step === task.total) break
+        const x = (step / task.total) * width
+        ctx.fillStyle = x < head ? 'rgba(255,255,255,.7)' : '#6f6d67'
+        if (i === n) ctx.fillRect(x - 1.5, height / 2 - 6, 3, 12)
+        else { ctx.beginPath(); ctx.arc(x, height / 2, 2, 0, Math.PI * 2); ctx.fill() }
+      }
+    }
+  }
+
+  const clock = seconds => {
+    const s = Math.max(0, Math.round(seconds * PACE))
+    return s
+  }
+
+  window.seek = t => {
+    document.getElementById('app').style.opacity = ease(t / 0.5)
+    document.getElementById('app').style.transform = `translateY(${(1 - ease(t / 0.5)) * 14}px)`
+    HEADLINES.forEach(([from, to], i) => {
+      const el = document.getElementById(`h${i}`)
+      const o = fade(t, from, to)
+      el.style.opacity = o
+      el.style.transform = `translateY(${(1 - o) * 8}px)`
+    })
+    document.getElementById('end').style.opacity = clamp((t - END_AT) / 0.35)
+
+    for (const task of TASKS) {
+      task.el.style.opacity = clamp((t - task.shownAt) / 0.3)
+      const done = task.stepsDoneAt.filter(at => t >= at).length
+      const fill = task.stepsDoneAt.reduce((sum, at) => sum + ease((t - at) / 0.35), 0) / task.total
+      const isDone = done === task.total
+      const needs = task.needsInput && t >= task.needsInput[0] && t < task.needsInput[1]
+      const state = isDone ? 'done' : needs ? 'needs' : 'running'
+
+      const glyph = task.el.querySelector('.glyph')
+      glyph.textContent = GLYPH[state]
+      glyph.style.color = COLOR[state]
+
+      let label = ''
+      if (isDone) label = `✓ ${clock(task.stepsDoneAt.at(-1) - task.startsAt)}s`
+      else {
+        let seen = 0
+        for (const [name, n] of task.stages) {
+          seen += n
+          if (done < seen) { label = name; break }
+        }
+        if (needs) label = `? ${label}`
+      }
+      const pill = task.el.querySelector('.pill')
+      pill.textContent = label
+      pill.style.background = COLOR[state]
+      const canvas = task.el.querySelector('canvas')
+      const track = task.el.querySelector('.track')
+      if (canvas.width !== track.clientWidth) { canvas.width = track.clientWidth; canvas.height = track.clientHeight }
+      drawBar(task, fill, state)
+      pill.style.left = `${Math.max(0, fill * canvas.width - pill.offsetWidth)}px`
+      task.el.querySelector('.pct').textContent = `${Math.round((done / task.total) * 100)}%`
+
+      task.el.querySelectorAll('.strip').forEach((strip, i) => {
+        const agent = task.agents[i]
+        strip.style.opacity = clamp((t - agent.from + 0.15) / 0.25)
+        const over = t >= agent.to
+        const waiting = agent.waits && t >= agent.waits[0] && t < agent.waits[1]
+        const s = over ? 'done' : waiting ? 'needs' : 'running'
+        strip.querySelector('.lane').style.background = LANE[s]
+        strip.querySelector('.sdot').style.background = COLOR[s]
+        const tool = strip.querySelector('.tool')
+        tool.textContent = over ? '' : waiting ? 'Needs approval' : agent.tools.filter(([at]) => t >= at).at(-1)?.[1] ?? ''
+        tool.style.color = waiting ? '#e0a050' : '#a58ff0'
+        const elapsed = clock(Math.min(t, agent.to) - agent.from)
+        strip.querySelector('.clock').textContent = over ? `${elapsed}s` : String(elapsed).padStart(2, '0') + 's'
+      })
+    }
+  }
+
+  window.ready = document.fonts.ready.then(() => seek(0))
+</script>
+</body>
+</html>
