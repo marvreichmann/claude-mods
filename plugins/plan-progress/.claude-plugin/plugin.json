@@ -3,10 +3,22 @@
   "displayName": "Plan Progress",
   "version": "1.0.1",
   "description": "Live progress bars above the prompt for task lists and multi-stage plans, in five animated styles, with stage ticks and sounds",
-  "author": { "name": "Marvin Reichmann", "url": "https://github.com/marvreichmann" },
+  "author": {
+    "name": "Marvin Reichmann",
+    "url": "https://github.com/marvreichmann"
+  },
   "homepage": "https://github.com/marvreichmann/claude-mods/tree/main/plugins/plan-progress",
   "repository": "https://github.com/marvreichmann/claude-mods",
+  "documentationUrl": "https://github.com/marvreichmann/claude-mods/tree/main/plugins/plan-progress#readme",
+  "supportUrl": "https://github.com/marvreichmann/claude-mods/issues",
+  "privacyPolicyUrl": "https://github.com/marvreichmann/claude-mods/blob/main/PRIVACY.md",
   "license": "MIT",
-  "keywords": ["progress", "plans", "tasks", "terminal", "mod"],
+  "keywords": [
+    "progress",
+    "plans",
+    "tasks",
+    "terminal",
+    "mod"
+  ],
   "types": "./types/index.d.ts"
 }

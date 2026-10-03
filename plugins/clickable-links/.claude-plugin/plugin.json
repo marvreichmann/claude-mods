@@ -3,9 +3,22 @@
   "displayName": "Clickable Links",
   "version": "1.0.1",
   "description": "Click links in Claude's replies to open them in your browser, with a row of hover-underlined links under each reply",
-  "author": { "name": "Marvin Reichmann", "url": "https://github.com/marvreichmann" },
+  "author": {
+    "name": "Marvin Reichmann",
+    "url": "https://github.com/marvreichmann"
+  },
   "homepage": "https://github.com/marvreichmann/claude-mods/tree/main/plugins/clickable-links",
   "repository": "https://github.com/marvreichmann/claude-mods",
+  "documentationUrl": "https://github.com/marvreichmann/claude-mods/tree/main/plugins/clickable-links#readme",
+  "supportUrl": "https://github.com/marvreichmann/claude-mods/issues",
+  "privacyPolicyUrl": "https://github.com/marvreichmann/claude-mods/blob/main/PRIVACY.md",
   "license": "MIT",
-  "keywords": ["links", "urls", "browser", "terminal", "hyperlinks", "mod"]
+  "keywords": [
+    "links",
+    "urls",
+    "browser",
+    "terminal",
+    "hyperlinks",
+    "mod"
+  ]
 }
