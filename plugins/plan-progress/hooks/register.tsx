@@ -283,21 +283,33 @@ export const register: Register = on => {
     await readTheme($)
     $.clock.every(THEME_POLL_MS, () => void readTheme($).catch(() => undefined))
 
+    // Time drives every animation, not the tick count: a late tick then never hitches the motion.
+    let last = Date.now()
     $.clock.every(FRAME_MS, () => {
-      frame += FRAME_MS / 50
+      const now = Date.now()
+      // A clock that seems not to move (a sandbox may pin it) counts one frame.
+      const elapsed = now > last ? Math.min(100, now - last) : FRAME_MS
+      last = now
+      frame += elapsed / 50
+      // The easing is tuned per 1/60s step: take as many steps as the time that passed.
+      const steps = Math.max(1, Math.round(elapsed / (1000 / 60)))
       for (const [id, bar] of mounted) {
         const target = progressOf(bar.plan)
         const from = shown.get(id) ?? 0
-        let to: number
-        if (bar.style === 'pixel') {
-          to = Math.abs(target - from) < 0.002 ? target : from + (target - from) * 0.064
-        } else {
-          // A near-critically damped spring: about 0.3s to settle, no visible bounce.
-          const v = (velocity.get(id) ?? 0) * 0.6 + (target - from) * 0.06
-          const settled = Math.abs(target - from) < 0.002 && Math.abs(v) < 0.001
-          to = settled ? target : Math.min(1, Math.max(0, from + v))
-          velocity.set(id, settled ? 0 : v)
+        let to = from
+        let v = velocity.get(id) ?? 0
+        for (let i = 0; i < steps; i++) {
+          if (bar.style === 'pixel') {
+            to = Math.abs(target - to) < 0.002 ? target : to + (target - to) * 0.064
+          } else {
+            // A near-critically damped spring: about 0.3s to settle, no visible bounce.
+            v = v * 0.6 + (target - to) * 0.06
+            const settled = Math.abs(target - to) < 0.002 && Math.abs(v) < 0.001
+            to = settled ? target : Math.min(1, Math.max(0, to + v))
+            if (settled) v = 0
+          }
         }
+        velocity.set(id, v)
         shown.set(id, to)
         if (to === from && bar.plan.status !== 'active') continue
         const cells = encode(barCells(bar.plan, bar.width, to, frame, bar.style))

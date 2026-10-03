@@ -297,7 +297,7 @@ const solid = (c: Cells) => headed(c, x => c.put(x, 0x20, c.colors.pill, c.color
 const flow = (plan: Plan, c: Cells, frame: number) => {
   if (plan.status === 'done') return void solid(c)
   const { put, colors } = c
-  const shift = Math.floor(frame * (plan.status === 'active' ? 0.8 : 0.15))
+  const shift = Math.floor(frame * (plan.status === 'active' ? 0.55 : 0.15))
   // Braille dot bits by [column][row] of the 2x4 cell.
   const BITS = [
     [0x01, 0x02, 0x04, 0x40],
