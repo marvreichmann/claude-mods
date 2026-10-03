@@ -13,8 +13,8 @@ const theme = atom({ plugin: 'plan-progress', key: 'theme' } as const, null)
 
 const TOOL = 'mcp__plan-progress__progress'
 const HIDE_DONE_MS = 30_000
-// 30 frames a second, the band's redraw ceiling; animations count in 50ms ticks.
-const FRAME_MS = 33
+// About 60 frames a second, what a blit shows at most; animations count in 50ms ticks.
+const FRAME_MS = 16
 const THEME_POLL_MS = 3000
 const PICKER = 'progress-style'
 const ABOUT: Record<BarStyle, string> = {
@@ -290,10 +290,10 @@ export const register: Register = on => {
         const from = shown.get(id) ?? 0
         let to: number
         if (bar.style === 'pixel') {
-          to = Math.abs(target - from) < 0.002 ? target : from + (target - from) * 0.123
+          to = Math.abs(target - from) < 0.002 ? target : from + (target - from) * 0.064
         } else {
-          // A near-critically damped spring: about 0.27s to settle, no visible bounce.
-          const v = (velocity.get(id) ?? 0) * 0.35 + (target - from) * 0.2
+          // A near-critically damped spring: about 0.3s to settle, no visible bounce.
+          const v = (velocity.get(id) ?? 0) * 0.6 + (target - from) * 0.06
           const settled = Math.abs(target - from) < 0.002 && Math.abs(v) < 0.001
           to = settled ? target : Math.min(1, Math.max(0, from + v))
           velocity.set(id, settled ? 0 : v)

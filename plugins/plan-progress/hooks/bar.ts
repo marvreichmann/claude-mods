@@ -117,6 +117,9 @@ export const STYLES = ['flow', 'comet', 'pixel', 'rain', 'ripple'] as const
 export type BarStyle = (typeof STYLES)[number]
 export const isStyle = (name: string): name is BarStyle => (STYLES as readonly string[]).includes(name)
 
+/** Smoothstep: 0..1 eased in and out. */
+const smooth = (t: number): number => t * t * (3 - 2 * t)
+
 const mix = (a: number, b: number, t: number): number => {
   const k = Math.max(0, Math.min(1, t))
   const ch = (shift: number) => {
@@ -227,8 +230,12 @@ const pixel = (plan: Plan, c: Cells, frame: number) => {
         if (noise(dot, epoch * 29 + 1) < density) bits |= BRAILLE[dx]![dy]!
       }
     }
-    const cellEpoch = moving ? Math.floor((frame + noise(x, 9) * 24) / 24) : 0
-    const glow = (0.25 + 0.75 * near) * (0.55 + 0.45 * noise(x, cellEpoch * 13 + 2))
+    // Each cell's brightness eases from one level to the next instead of snapping.
+    const time = moving ? (frame + noise(x, 9) * 24) / 24 : 0
+    const epoch = Math.floor(time)
+    const ease = smooth(time - epoch)
+    const level = noise(x, epoch * 13 + 2) * (1 - ease) + noise(x, (epoch + 1) * 13 + 2) * ease
+    const glow = (0.25 + 0.75 * near) * (0.55 + 0.45 * level)
     put(x, 0x2800 + bits, mix(colors.dot, colors.hi, glow), colors.fill)
   })
 }
