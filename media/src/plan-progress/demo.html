@@ -5,12 +5,13 @@
 <title>Plan Progress demo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=block" rel="stylesheet">
+<script src="bar.js"></script>
 <style>
-  /* An 8.6 s clip of plan-progress in the Claude Code terminal, in the style
-     of the clickable-links one. The terminal draws each task as one text row
-     (register.tsx, the AbovePrompt hook without Svg): state glyph, title, a
-     25-cell ━/─ bar, "Stage step/size", percent, ✕. render(t) below draws
-     every moment, since the rows change as text. */
+  /* An 8.8 s clip of plan-progress in the Claude Code terminal, in the style
+     of the clickable-links one. The bars are the plugin's own: bar.js is its
+     hooks/bar.ts, and render(t) calls barCells() with the plugin's spring
+     easing and 50 ms animation ticks, then paints the cells on a terminal
+     grid, the band laid out as its AbovePrompt hook lays it out. */
   :root {
     --term: #16141f;
     --term-edge: #2c2840;
@@ -54,19 +55,14 @@
   .body { position: absolute; top: 40px; left: 34px; right: 34px; bottom: 0; }
   .line { white-space: pre; height: 31px; }
   .dim { color: var(--dim); }
-  .transcript { position: absolute; top: 18px; left: 0; right: 0; height: 248px; overflow: hidden; }
-  .dialog { border: 1px solid #6a5a9a; border-radius: 6px; padding: 0 14px; margin: 2px 0 2px 26px; width: 520px; }
-  .dialog .title { color: #a58ff0; font-weight: 700; }
-  .band { position: absolute; left: 0; right: 0; top: 296px; }
-  .row { display: flex; gap: 0.6em; white-space: pre; height: 31px; } /* gap={1}: one cell */
-  .row .title { flex: 1; overflow: hidden; }
+  .transcript { position: absolute; top: 16px; left: 0; right: 0; overflow: hidden; }
+  #band { position: absolute; left: 0; }
   .input {
-    position: absolute; left: 0; right: 0; top: 404px;
+    position: absolute; left: 0; right: 0; top: 440px;
     border-top: 1px solid #45405c; border-bottom: 1px solid #45405c; padding: 6px 0; color: var(--dim);
   }
   .caret { display: inline-block; width: 11px; height: 22px; background: var(--dim); vertical-align: -4px; }
-  .modes { position: absolute; left: 0; right: 0; top: 462px; display: flex; white-space: pre; }
-  .modes .hint { margin-left: auto; }
+  .hint { position: absolute; left: 0; right: 0; top: 498px; white-space: pre; }
 
   .end {
     position: absolute; inset: 0; z-index: 10;
@@ -86,17 +82,17 @@
 </head>
 <body>
   <div class="headline" id="h0">Claude's plan, <em>right above the prompt</em></div>
-  <div class="headline" id="h1">One bar <em>per task</em></div>
-  <div class="headline" id="h2">Amber when it <em>needs you</em></div>
+  <div class="headline" id="h1">Particles <em>flow</em> toward the stage</div>
+  <div class="headline" id="h2">Plans and task lists, <em>side by side</em></div>
   <div class="headline" id="h3">Green when it's <em>done</em></div>
 
   <div class="term" id="term">
-    <div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>~/checkout-service — claude</span></div>
-    <div class="body">
+    <div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>~/shop — claude</span></div>
+    <div class="body" id="body">
       <div class="transcript" id="transcript"></div>
-      <div class="band" id="band"></div>
+      <canvas id="band"></canvas>
       <div class="input">&gt; <span class="caret"></span></div>
-      <div class="modes"><span id="toggle"></span><span class="hint dim">? for shortcuts</span></div>
+      <div class="hint dim">  ? for shortcuts</div>
     </div>
   </div>
 
@@ -107,77 +103,136 @@
   </div>
 
 <script>
-  window.DURATION = 8.6
+  window.DURATION = 8.8
+  const { barCells, progressOf } = PlanBar
 
-  // The mod's own state colors and glyphs (register.tsx STATE_COLOR, STATE_GLYPH).
-  const COLOR = { running: '#7858CA', needs_input: '#AD6400', done: '#18883A' }
-  const GLYPH = { running: '●', needs_input: '?', done: '✓' }
-  const CELLS = 25
-
-  const TASKS = [
-    {
-      title: 'Checkout flow', shownAt: 0.5,
-      stages: [['Explore', 2], ['Build', 3], ['Verify', 2]],
-      stepsDoneAt: [1.6, 2.4, 3.2, 5.0, 5.4, 5.8, 6.2],
-      needsInput: [3.6, 4.8],
-    },
-    {
-      title: 'Release notes', shownAt: 2.3,
-      stages: [['Collect', 2], ['Draft', 2]],
-      stepsDoneAt: [3.2, 3.9, 5.0, 6.0],
-    },
+  // Two bars: a staged plan (the plugin's own demo plan) and a task list,
+  // which the plugin shows as a one-stage plan named Tasks. Each advances one
+  // step at the listed times, as `progress` calls and TaskUpdate would.
+  const BARS = [
+    { id: 'release', title: 'Release pipeline', shownAt: 0.4,
+      stages: [['Build', 3], ['Test', 4], ['Deploy', 2]],
+      advances: [1.0, 1.55, 2.1, 2.65, 3.2, 3.75, 4.3, 4.85, 5.5] },
+    { id: 'notes', title: 'Write release notes', shownAt: 2.0,
+      stages: [['Tasks', 4]],
+      advances: [2.7, 3.7, 4.7, 5.7] },
   ]
-
-  // What Claude writes meanwhile; the transcript shows the newest lines that fit.
   const dim = text => `<span class="dim">${text}</span>`
   const TRANSCRIPT = [
-    [0.0, [dim('&gt; refactor the checkout flow and draft the release notes')]],
-    [0.3, ['', "● I'll track this as two tasks."]],
-    [0.8, ['', '● Task(Map payment routes)']],
-    [1.6, [dim('  ⎿  Done (6 tool uses · 18s)')]],
-    [2.4, ['', '● Task(Collect merged PRs)']],
-    [3.0, ['', '● Bash(npm run migrate)']],
-    [3.6, [{ dialog: true, until: 4.8 }]],
-    [4.8, [dim('  ⎿  Applied 3 migrations')]],
-    [5.0, ['', '● Update(src/checkout/cart.ts)']],
-    [5.4, [dim('  ⎿  Updated with 12 additions')]],
-    [6.0, ['', '● Write(RELEASE_NOTES.md)']],
-    [6.4, ['', '● Both tasks are done.']],
+    [0.0, [dim('&gt; ship the release: build, test, deploy, write the notes')]],
+    [0.3, ['', "● I'll track the release as a plan."]],
+    [0.9, ['', '● Bash(npm run build)']],
+    [2.0, ['', '● TaskCreate(4 tasks)']],
+    [2.6, [dim('  ⎿  Build finished in 41s')]],
+    [3.2, ['', '● Bash(npm test)']],
+    [4.3, [dim('  ⎿  128 passed')]],
+    [4.6, ['', '● Bash(npm run deploy)']],
+    [5.5, [dim('  ⎿  Deployed v2.4.0')]],
+    [6.0, ['', '● Released v2.4.0, notes in RELEASE_NOTES.md.']],
   ]
-  const DIALOG = `<div class="dialog"><div class="line title">Bash command</div><div class="line">  npm run migrate</div><div class="line">Do you want to proceed?</div><div class="line">❯ 1. Yes</div><div class="line dim">  2. No</div></div>`
-  const DIALOG_LINES = 5.4
-  const VISIBLE_LINES = 8
-
-  const HEADLINES = [[0.1, 2.2], [2.3, 3.5], [3.6, 4.9], [5.0, 6.8]]
-  const END_AT = 6.9
+  const HEADLINES = [[0.1, 2.0], [2.1, 3.9], [4.0, 5.6], [5.7, 7.1]]
+  const END_AT = 7.2
 
   const clamp = (x, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, x))
   const ease = x => 1 - Math.pow(1 - clamp(x), 3)
   const fade = (t, from, to, edge = 0.2) => clamp(Math.min((t - from) / edge, (to - t) / edge))
-  const esc = s => s.replace(/&(?!\w+;)/g, '&amp;')
 
-  // One task row exactly as the terminal draws it.
-  const rowOf = (task, t) => {
-    const total = task.stages.reduce((sum, [, n]) => sum + n, 0)
-    const done = task.stepsDoneAt.filter(at => t >= at).length
-    const isDone = done === total
-    const needs = task.needsInput && t >= task.needsInput[0] && t < task.needsInput[1]
-    const state = isDone ? 'done' : needs ? 'needs_input' : 'running'
-    const pct = isDone ? 100 : Math.round((done / total) * 100)
-    // where(): the first unfinished step, or the last one when all are done
-    const at = Math.min(done, total - 1)
-    let seen = 0, stage = '', step = 0, size = 0
-    for (const [name, n] of task.stages) {
-      if (at < seen + n) { stage = name; step = at - seen + 1; size = n; break }
-      seen += n
+  // The plan as the plugin holds it at time t: steps done per stage, the current stage, done.
+  const planAt = (bar, t) => {
+    let left = bar.advances.filter(at => t >= at).length
+    const stages = bar.stages.map(([name, total]) => {
+      const done = Math.min(total, left)
+      left -= done
+      return { name, total, done }
+    })
+    const current = Math.max(0, stages.findIndex(s => s.done < s.total))
+    const isDone = stages.every(s => s.done === s.total)
+    return { id: bar.id, title: bar.title, stages, current: isDone ? stages.length - 1 : current, status: isDone ? 'done' : 'active' }
+  }
+
+  // register.tsx's frame timer: a near-critically damped spring, stepped 60 times a second.
+  const shownAt = (bar, t) => {
+    let to = 0, v = 0
+    for (let step = 0; step < Math.round((t - bar.shownAt) * 60); step++) {
+      const target = progressOf(planAt(bar, bar.shownAt + step / 60))
+      v = v * 0.6 + (target - to) * 0.06
+      const settled = Math.abs(target - to) < 0.002 && Math.abs(v) < 0.001
+      to = settled ? target : Math.min(1, Math.max(0, to + v))
+      if (settled) v = 0
     }
-    const full = Math.round(pct / 4)
-    const color = COLOR[state]
-    return `<div class="row" style="opacity:${clamp((t - task.shownAt) / 0.3)}">` +
-      `<span style="color:${color}">${GLYPH[state]}</span><span class="title">${task.title}</span>` +
-      `<span><span style="color:${color}">${'━'.repeat(full)}</span><span class="dim">${'─'.repeat(CELLS - full)}</span>` +
-      `<span style="color:${color}"> ${stage} ${step}/${size}</span></span>` +
-      `<span class="dim">${String(pct).padStart(3, ' ')}%</span><span class="dim">✕</span></div>`
+    return to
+  }
+
+  const hex = n => `#${n.toString(16).padStart(6, '0')}`
+  let CW = 12.6
+  const CH = 31
+
+  // Paints one terminal cell: a background, then its character as a terminal draws it.
+  const paintCell = (ctx, col, row, ch, fg, bg) => {
+    const x = col * CW, y = row * CH
+    if (bg !== undefined) { ctx.fillStyle = bg; ctx.fillRect(x, y, CW + 0.5, CH) }
+    ctx.fillStyle = fg
+    if (ch >= 0x2800 && ch <= 0x28ff) {
+      const bits = ch - 0x2800
+      const BRAILLE = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20, 0x80]]
+      for (let dx = 0; dx < 2; dx++) for (let dy = 0; dy < 4; dy++) {
+        if (!(bits & BRAILLE[dx][dy])) continue
+        ctx.beginPath()
+        ctx.arc(x + CW * (0.3 + 0.4 * dx), y + CH * (0.2 + 0.2 * dy), CW * 0.12, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    } else if (ch >= 0x2589 && ch <= 0x258f) {
+      ctx.fillRect(x, y, CW * ((0x2590 - ch) / 8), CH)
+    } else if (ch === 0x2502 || ch === 0x2575) {
+      ctx.fillRect(x + CW / 2 - 0.75, y, 1.5, ch === 0x2502 ? CH : CH / 2)
+    } else if (ch !== 0x20 && ch !== 0) {
+      ctx.fillText(String.fromCodePoint(ch), x, y + CH * 0.72)
+    }
+  }
+  const paintText = (ctx, col, row, text, fg) => {
+    Array.from(text).forEach((c, i) => paintCell(ctx, col + i, row, c.codePointAt(0), fg))
+  }
+
+  // The AbovePrompt band: a round grey border, one row per bar (register.tsx 470-512).
+  const drawBand = t => {
+    const canvas = document.getElementById('band')
+    const ctx = canvas.getContext('2d')
+    const body = document.getElementById('body')
+    const columns = Math.floor(body.clientWidth / CW)
+    const inner = Math.max(20, columns - 4)
+    const titleWidth = Math.max(10, Math.min(32, Math.floor(inner * 0.26)))
+    const width = Math.max(8, inner - titleWidth - 10)
+    const rows = BARS.filter(bar => t >= bar.shownAt)
+    canvas.width = columns * CW
+    canvas.height = (rows.length + 2) * CH
+    canvas.style.top = `${434 - canvas.height}px`
+    canvas.style.display = rows.length ? 'block' : 'none'
+    ctx.font = `21px 'JetBrains Mono'`
+    const grey = '#808080', dimGrey = '#8a8599', text = '#e6e3ef'
+    const last = columns - 1
+    paintText(ctx, 0, 0, `╭${'─'.repeat(columns - 2)}╮`, grey)
+    paintText(ctx, 0, rows.length + 1, `╰${'─'.repeat(columns - 2)}╯`, grey)
+    rows.forEach((bar, i) => {
+      const row = i + 1
+      ctx.globalAlpha = clamp((t - bar.shownAt) / 0.25)
+      paintText(ctx, 0, row, '│', grey)
+      paintText(ctx, last, row, '│', grey)
+      const plan = planAt(bar, t)
+      const color = plan.status === 'done' ? '#34b36f' : PlanBar.runningHex()
+      let col = 2
+      paintText(ctx, col, row, plan.status === 'done' ? '✓' : '●', color)
+      col += 2
+      const title = plan.title.length > titleWidth ? plan.title.slice(0, titleWidth - 1) + '…' : plan.title
+      paintText(ctx, col, row, title, text)
+      col += titleWidth + 1
+      const cells = barCells(plan, width, shownAt(bar, t), t * 20, 'flow')
+      for (let x = 0; x < width; x++) paintCell(ctx, col + x, row, cells[x * 3], hex(cells[x * 3 + 1]), hex(cells[x * 3 + 2]))
+      col += width + 1
+      paintText(ctx, col, row, `${Math.round(progressOf(plan) * 100)}%`.padStart(4), dimGrey)
+      col += 5
+      paintText(ctx, col, row, '×', dimGrey)
+      ctx.globalAlpha = 1
+    })
   }
 
   window.seek = t => {
@@ -192,31 +247,22 @@
     })
     document.getElementById('end').style.opacity = clamp((t - END_AT) / 0.35)
 
-    // newest lines that fit, a dialog counting as its height
-    const blocks = []
-    for (const [at, lines] of TRANSCRIPT) {
-      if (t < at) break
-      for (const line of lines) {
-        if (typeof line === 'object') { if (t < line.until) blocks.push([DIALOG, DIALOG_LINES]) }
-        else blocks.push([`<div class="line">${line === '' ? ' ' : esc(line)}</div>`, 1])
-      }
-    }
-    let room = VISIBLE_LINES
-    const shown = []
-    for (const [html, height] of blocks.reverse()) {
-      if (height > room) break
-      shown.unshift(html)
-      room -= height
-    }
-    document.getElementById('transcript').innerHTML = shown.join('')
-
-    const visible = TASKS.filter(task => t >= task.shownAt - 0.05)
-    document.getElementById('band').innerHTML = visible.map(task => rowOf(task, t)).join('<div class="row"> </div>')
-    // the SessionMode button: [ Progress ] with one bar, [ Progress 2 ] with two
-    document.getElementById('toggle').textContent = visible.length > 1 ? '[ Progress 2 ]' : '[ Progress ]'
+    drawBand(t)
+    // the transcript ends just above the band
+    const band = document.getElementById('band')
+    const room = Math.floor((434 - (band.style.display === 'none' ? 0 : band.height) - 16) / CH)
+    const lines = []
+    for (const [at, add] of TRANSCRIPT) if (t >= at) lines.push(...add)
+    document.getElementById('transcript').innerHTML = lines.slice(-room)
+      .map(line => `<div class="line">${line === '' ? ' ' : line}</div>`).join('')
   }
 
-  window.ready = document.fonts.ready.then(() => seek(0))
+  window.ready = document.fonts.ready.then(() => {
+    const ctx = document.getElementById('band').getContext('2d')
+    ctx.font = `21px 'JetBrains Mono'`
+    CW = ctx.measureText('M').width
+    seek(0)
+  })
 </script>
 </body>
 </html>
