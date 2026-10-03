@@ -5,13 +5,18 @@
     "url": "https://github.com/marvreichmann"
   },
   "metadata": {
-    "description": "Safe fork of zycck/claude-mods. plan-progress with the host file write removed."
+    "description": "Claude Code mods by Marvin Reichmann: clickable links, and plan-progress (a safe fork of zycck/claude-mods)."
   },
   "plugins": [
     {
       "name": "plan-progress",
       "source": "./plugins/plan-progress",
       "description": "Live plan progress bars above the Claude Code prompt with soft sounds"
+    },
+    {
+      "name": "clickable-links",
+      "source": "./plugins/clickable-links",
+      "description": "Click links in Claude's replies to open them in your browser, with a row of hover-underlined links under each reply"
     }
   ]
 }
