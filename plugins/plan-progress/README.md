@@ -60,8 +60,8 @@ On Linux, sounds play through `pw-play`, `paplay` or `aplay`; on macOS through `
 ## Tools, hooks and commands
 
 - **The `progress` tool:** the plugin adds this tool (`mcp__plan-progress__progress`) and answers its calls itself: it updates the bar and returns a one-line confirmation to Claude. It stands in for no other tool
-- **`TodoWrite`, `TaskCreate`, `TaskUpdate`:** the plugin watches these calls to draw task-list bars. Each call runs exactly as it would without the plugin; the plugin reads its input and result afterwards and never changes or blocks it
-- **`/progress`:** the command the plugin adds, with the subcommands under [Commands](#commands)
+- **`TodoWrite`, `TaskCreate`, `TaskUpdate`:** the plugin watches these calls to draw task-list bars, whether Claude, a subagent or other code makes them. Each call runs exactly as it would without the plugin; the plugin reads its input and result afterwards and never changes or blocks it
+- **`/progress`:** the command the plugin adds. Its handler answers every run of `/progress`, whether you type it or other code runs it, with the subcommands under [Commands](#commands): it changes only this plugin's own bars and settings, and handles no other command
 
 ## Requirements
 
