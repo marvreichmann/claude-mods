@@ -75,7 +75,7 @@ test('flow and comet finish as one solid color', () => {
 
 test('a running bar takes the Omarchy accent; done stays green', () => {
   const theme = parseTheme('accent = "#e75a50"\nforeground = "#efebdc"\nbackground = "#1B1B1B"\n')
-  expect(theme).toEqual({ accent: 0xe75a50, background: 0x1b1b1b })
+  expect(theme).toEqual({ accent: 0xe75a50, background: 0x1b1b1b, foreground: 0xefebdc })
   expect(parseTheme('foreground = "#ffffff"')).toBeUndefined()
 
   const pillBg = (plan: Plan) => {
@@ -86,8 +86,13 @@ test('a running bar takes the Omarchy accent; done stays green', () => {
   useTheme(theme)
   expect(pillBg(release)).toBe(0xe75a50)
   expect(pillBg({ ...release, status: 'done' })).toBe(0x34b36f)
+  // The empty track sits just above the theme's background, in its hue.
+  const track = barCells(release, 60, progressOf(release), 0)[59 * 3 + 2]!
+  expect(track).not.toBe(0x2a2a30)
+  expect(Math.abs(((track >> 16) & 255) - 0x1b)).toBeLessThan(16)
   useTheme(undefined)
   expect(pillBg(release)).toBe(0x8b7cf6)
+  expect(barCells(release, 60, progressOf(release), 0)[59 * 3 + 2]).toBe(0x2a2a30)
 })
 
 test('a todo list is a one-stage plan titled by what is in progress', () => {

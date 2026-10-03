@@ -10,7 +10,7 @@ const PALETTES: Record<Plan['status'], Palette> = {
 // What a running bar is drawn in: the default purple, or one built from a theme's accent.
 let running: Palette = PALETTES.active
 
-export type Theme = { accent: number; background: number }
+export type Theme = { accent: number; background: number; foreground: number }
 
 /** The `accent` and `background` of an Omarchy colors.toml; undefined without an accent. */
 export const parseTheme = (toml: string): Theme | undefined => {
@@ -19,7 +19,8 @@ export const parseTheme = (toml: string): Theme | undefined => {
     return hex === undefined ? undefined : parseInt(hex, 16)
   }
   const accent = color('accent')
-  return accent === undefined ? undefined : { accent, background: color('background') ?? 0x1b1b1b }
+  if (accent === undefined) return undefined
+  return { accent, background: color('background') ?? 0x1b1b1b, foreground: color('foreground') ?? 0xe0e0e0 }
 }
 
 const luminance = (rgb: number): number =>
@@ -29,9 +30,15 @@ const luminance = (rgb: number): number =>
 export const useTheme = (theme: Theme | undefined): void => {
   if (theme === undefined) {
     running = PALETTES.active
+    TRACK = DEFAULT_TRACK.bg
+    TRACK_TICK = DEFAULT_TRACK.tick
+    TRACK_MAJOR = DEFAULT_TRACK.major
     return
   }
-  const { accent, background } = theme
+  const { accent, background, foreground } = theme
+  TRACK = mix(background, foreground, 0.06)
+  TRACK_TICK = mix(background, foreground, 0.2)
+  TRACK_MAJOR = mix(background, foreground, 0.4)
   running = {
     pill: accent,
     fill: mix(background, accent, 0.28),
@@ -45,9 +52,11 @@ export const useTheme = (theme: Theme | undefined): void => {
 
 /** The running color as `#rrggbb`, for the row's status dot. */
 export const runningHex = (): string => `#${running.pill.toString(16).padStart(6, '0')}`
-const TRACK = 0x2a2a30
-const TRACK_TICK = 0x4c4c56
-const TRACK_MAJOR = 0x7a7a88
+// The empty track and its ticks: fixed greys, or a theme's background lifted toward its foreground.
+const DEFAULT_TRACK = { bg: 0x2a2a30, tick: 0x4c4c56, major: 0x7a7a88 }
+let TRACK = DEFAULT_TRACK.bg
+let TRACK_TICK = DEFAULT_TRACK.tick
+let TRACK_MAJOR = DEFAULT_TRACK.major
 // U+258F..U+2589: a left-anchored block one eighth to seven eighths wide.
 const EIGHTHS = [0, 0x258f, 0x258e, 0x258d, 0x258c, 0x258b, 0x258a, 0x2589]
 const DITHER = [0x2598, 0x259d, 0x2596, 0x2597, 0x259a, 0x259e, 0x2580, 0x2584, 0xb7]
@@ -262,7 +271,7 @@ const comet = (plan: Plan, c: Cells, frame: number) => {
   for (let x = end + 1; x < width; x++) {
     if (c.ticks.has(x)) continue
     const r = noise(x, twinkle * 13)
-    if (r < 0.07) put(x, r < 0.02 ? 0x2b : 0xb7, r < 0.02 ? 0x8a84b8 : TRACK_TICK, TRACK)
+    if (r < 0.07) put(x, r < 0.02 ? 0x2b : 0xb7, r < 0.02 ? mix(TRACK_MAJOR, running.hi, 0.5) : TRACK_TICK, TRACK)
   }
 }
 

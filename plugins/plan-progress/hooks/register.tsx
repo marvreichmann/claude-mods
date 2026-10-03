@@ -229,7 +229,7 @@ async function readTheme($: EngineInterface) {
   const toml = state ? await $.fs.read(`${state}/omarchy/current/theme/colors.toml`).catch(() => undefined) : undefined
   const found: ThemeColors | null = (toml !== undefined && parseTheme(toml)) || null
   const now = await read($, theme)
-  if (now?.accent !== found?.accent || now?.background !== found?.background) await update($, theme, () => found)
+  if (now?.accent !== found?.accent || now?.background !== found?.background || now?.foreground !== found?.foreground) await update($, theme, () => found)
 }
 
 export const register: Register = on => {

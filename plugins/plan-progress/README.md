@@ -9,7 +9,7 @@ Bars come from two places:
 
 Finished bars leave after 30 seconds; `×` dismisses one.
 
-On Omarchy, running bars take the active theme's `accent` color (from `~/.local/state/omarchy/current/theme/colors.toml`) and follow theme switches within a few seconds; elsewhere they stay purple. Done is always green, failed red.
+On Omarchy, running bars take the active theme's `accent` color, and the empty track its `background` and `foreground`, (from `~/.local/state/omarchy/current/theme/colors.toml`) and follow theme switches within a few seconds; elsewhere they stay purple. Done is always green, failed red.
 
 ## Styles
 

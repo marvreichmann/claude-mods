@@ -20,7 +20,7 @@ export type TaskItem = {
 export type TaskList = { title: string; items: TaskItem[] }
 
 /** The active Omarchy theme's colors, as 0xRRGGBB. */
-export type ThemeColors = { accent: number; background: number }
+export type ThemeColors = { accent: number; background: number; foreground: number }
 
 declare module 'claude-code' {
   interface PluginState {
