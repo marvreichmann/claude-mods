@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>plan-progress icon</title>
+<style>
+  /* 512x512 listing icon: a flow-style bar, its braille particles thickening toward the stage pill. */
+  html, body { margin: 0; width: 512px; height: 512px; overflow: hidden; background: transparent; }
+</style>
+</head>
+<body>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a1f52"/>
+      <stop offset="1" stop-color="#0d0b18"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.2" r="0.7">
+      <stop offset="0" stop-color="#5a3fb0" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#5a3fb0" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="track"><rect x="56" y="206" width="400" height="100" rx="50"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <!-- the track and its filled part -->
+  <rect x="56" y="206" width="400" height="100" rx="50" fill="#2a2a30"/>
+  <g clip-path="url(#track)">
+    <rect x="56" y="206" width="300" height="100" fill="#312b55"/>
+    <g id="dots"></g>
+  </g>
+  <!-- stage ticks on the empty track -->
+  <rect x="404" y="232" width="6" height="48" rx="3" fill="#7a7a88"/>
+  <!-- the pill riding the head -->
+  <rect x="270" y="206" width="110" height="100" rx="50" fill="#8b7cf6"/>
+  <path d="M305 256 l18 18 l34 -38" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+<script>
+  // Braille-like dots, sparse at the tail and denser toward the pill, from a fixed seed.
+  let seed = 7
+  const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296)
+  const g = document.getElementById('dots')
+  for (let x = 72; x < 270; x += 13) {
+    const near = (x - 72) / 198
+    for (let y = 222; y <= 292; y += 17) {
+      if (random() > 0.15 + 0.75 * near * near) continue
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+      c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 4.2)
+      c.setAttribute('fill', `rgb(${Math.round(106 + 79 * near)},${Math.round(95 + 80 * near)},${Math.round(196 + 59 * near)})`)
+      g.append(c)
+    }
+  }
+</script>
+</body>
+</html>

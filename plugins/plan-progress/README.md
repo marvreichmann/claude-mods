@@ -46,14 +46,22 @@ On Linux, sounds play through `pw-play`, `paplay` or `aplay`; on macOS through `
 
 ## What it runs and reads
 
-- **Runs:** a sound player for the plugin's own two sounds (`sounds/tick.wav`, `sounds/done.wav`), unless you `/progress mute`. It looks one up with `which` (`pw-play`, `paplay`, `afplay`, then `aplay`) and plays the file with it; with none found, Claude Code's own player plays it. Nothing else is run
+- **Runs:** only local programs, to play the plugin's own two sounds (`sounds/tick.wav` on each step, `sounds/done.wav` at the finish), unless you `/progress mute`. Claude Code's own player plays nothing in a Linux terminal, so the plugin uses the system's:
+  - once per session, to find a player: `which pw-play`, `which paplay`, `which afplay`, `which aplay`, stopping at the first that exists
+  - for each sound: that player with the sound file's path, `pw-play <plugin folder>/sounds/tick.wav` (or `paplay`, `afplay`, `aplay -q`). With none found, Claude Code's own player plays the file instead
+- **Sends:** nothing leaves your machine. The only thing the plugin passes outside itself is the path of one of its own sound files, to the player above. No conversation text, task text, theme data or anything else is passed to any program or sent anywhere. No network access
 - **Reads:**
-  - the input of Claude's `TodoWrite`, `TaskCreate` and `TaskUpdate` calls, to draw task lists
-  - the calls Claude makes to the `progress` tool this plugin adds (`mcp__plan-progress__progress`), to draw staged plans
+  - the input and result of Claude's `TodoWrite`, `TaskCreate` and `TaskUpdate` calls, to draw task lists
+  - the calls Claude makes to the `progress` tool this plugin adds, to draw staged plans
   - the session's list of subagents, to give each agent's task list its own row
-  - `HOME` and `XDG_STATE_HOME`, to find the Omarchy theme file `~/.local/state/omarchy/current/theme/colors.toml`, read every few seconds for its `accent`, `background` and `foreground` colors. On systems without Omarchy the file is missing and the bars stay purple
-- **Network:** none. The plugin fetches nothing and sends nothing
-- **Stores:** two settings in Claude Code's plugin storage on your machine: the bar style you pick and whether sounds are muted. No other data is saved, collected or sent anywhere
+  - the environment variables `HOME` and `XDG_STATE_HOME`, only to build the path of the Omarchy theme file `~/.local/state/omarchy/current/theme/colors.toml`, which it reads every 3 seconds for its `accent`, `background` and `foreground` colors. These are not credentials and are not passed anywhere. Without Omarchy the file is missing and the bars stay purple
+- **Stores:** two settings in Claude Code's plugin storage on your machine: the bar style you pick and whether sounds are muted. Nothing else is saved or collected
+
+## Tools, hooks and commands
+
+- **The `progress` tool:** the plugin adds this tool (`mcp__plan-progress__progress`) and answers its calls itself: it updates the bar and returns a one-line confirmation to Claude. It stands in for no other tool
+- **`TodoWrite`, `TaskCreate`, `TaskUpdate`:** the plugin watches these calls to draw task-list bars. Each call runs exactly as it would without the plugin; the plugin reads its input and result afterwards and never changes or blocks it
+- **`/progress`:** the command the plugin adds, with the subcommands under [Commands](#commands)
 
 ## Requirements
 
