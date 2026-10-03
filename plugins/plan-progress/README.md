@@ -44,6 +44,17 @@ Or load a checkout for one session with `claude --plugin-dir /path/to/plan-progr
 
 On Linux, sounds play through `pw-play`, `paplay` or `aplay`; on macOS through `afplay`.
 
+## What it runs and reads
+
+- **Runs:** a sound player for the plugin's own two sounds (`sounds/tick.wav`, `sounds/done.wav`), unless you `/progress mute`. It looks one up with `which` (`pw-play`, `paplay`, `afplay`, then `aplay`) and plays the file with it; with none found, Claude Code's own player plays it. Nothing else is run
+- **Reads:**
+  - the input of Claude's `TodoWrite`, `TaskCreate` and `TaskUpdate` calls, to draw task lists
+  - the calls Claude makes to the `progress` tool this plugin adds (`mcp__plan-progress__progress`), to draw staged plans
+  - the session's list of subagents, to give each agent's task list its own row
+  - `HOME` and `XDG_STATE_HOME`, to find the Omarchy theme file `~/.local/state/omarchy/current/theme/colors.toml`, read every few seconds for its `accent`, `background` and `foreground` colors. On systems without Omarchy the file is missing and the bars stay purple
+- **Network:** none. The plugin fetches nothing and sends nothing
+- **Stores:** two settings in Claude Code's plugin storage on your machine: the bar style you pick and whether sounds are muted. No other data is saved, collected or sent anywhere
+
 ## Requirements
 
 - Claude Code 2.1.287 or later. Mods (function hooks) are an early-access API that may change between releases

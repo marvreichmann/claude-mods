@@ -18,6 +18,13 @@ Hover an entry and it underlines; click it and it opens.
 - Terminal only: the desktop app and the IDE extensions already open links on a click, so their replies stay as they are
 - No network calls, no stored data
 
+## What it runs and reads
+
+- **Runs:** your system's URL opener, with the URL of the link you clicked as its only argument, when you click: `xdg-open <url>` on Linux, `open <url>` on macOS, `rundll32 url.dll,FileProtocolHandler <url>` on Windows. It tries them in that order and stops at the first that succeeds. Nothing runs until you click
+- **Reads:** the text of Claude's replies as Claude Code draws them, to find the `http` and `https` links in them
+- **Network:** none. The plugin fetches nothing; your browser opens the link
+- **Stores:** nothing. No files written, no settings saved, no data collected or sent anywhere
+
 ## Install
 
 In Claude Code:
