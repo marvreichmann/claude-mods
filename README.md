@@ -47,3 +47,7 @@ The clips in `media/` are HTML/CSS mock-ups, rendered frame by frame from `media
 ## License
 
 MIT, see [LICENSE](LICENSE).
+
+## Privacy
+
+Neither plugin collects data or uses the network; see [PRIVACY.md](PRIVACY.md).
