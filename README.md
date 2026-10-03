@@ -13,6 +13,10 @@ Mods for Claude Code (function-hook plugins), in one marketplace:
 
 Click a link in Claude's reply and it opens in your browser, in Claude Code's fullscreen terminal. Each reply with links also ends with a dim row of them that underline on hover. URLs in code are left alone. See [its README](plugins/clickable-links/README.md).
 
+![clickable-links: a click on a link in Claude's reply opens it in the browser; the row of links under the reply underlines on hover](media/clickable-links.gif)
+
+[Watch as MP4 (5 s)](media/clickable-links.mp4)
+
 ```
 /plugin install clickable-links@reichmann-mods
 ```
