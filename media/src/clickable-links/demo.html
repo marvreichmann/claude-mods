@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Clickable Links demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=block" rel="stylesheet">
+<style>
+  /* A 5 s clip. render.mjs seeks every animation to each frame's time, so
+     the timeline is all here: delays are absolute times from 0. */
+  :root {
+    --bg-1: #1b1530;
+    --bg-2: #0d0b18;
+    --term: #16141f;
+    --term-edge: #2c2840;
+    --text: #e6e3ef;
+    --dim: #8a8599;
+    --accent: #d97757;
+    --link: #8fb8ff;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; }
+  body {
+    background: radial-gradient(circle at 30% 20%, #3a2a6e 0%, transparent 55%),
+                radial-gradient(circle at 80% 90%, #5a2a3e 0%, transparent 50%),
+                linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    font-family: var(--sans);
+    color: var(--text);
+    position: relative;
+  }
+
+  /* Headlines above the terminal, one at a time */
+  .headline {
+    position: absolute; top: 34px; left: 0; right: 0;
+    text-align: center; font-size: 34px; font-weight: 800; letter-spacing: -0.02em;
+    opacity: 0;
+  }
+  .headline em { font-style: normal; color: var(--accent); }
+  .h1 { animation: show 1.9s 0s both; }
+  .h2 { animation: show 1.6s 1.6s both; }
+  .h3 { animation: show 0.9s 3.15s both; }
+  @keyframes show {
+    0% { opacity: 0; transform: translateY(8px); }
+    15%, 85% { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateY(-6px); }
+  }
+
+  /* The terminal */
+  .term {
+    position: absolute; left: 110px; top: 118px; width: 1060px; height: 420px;
+    background: var(--term); border: 1px solid var(--term-edge); border-radius: 14px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.55);
+    font-family: var(--mono); font-size: 25px; line-height: 1.55;
+    animation: rise .5s 0s both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+  .bar {
+    height: 40px; border-bottom: 1px solid var(--term-edge);
+    display: flex; align-items: center; gap: 8px; padding: 0 16px;
+    font-family: var(--sans); font-size: 14px; color: var(--dim);
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: #3a3650; }
+  .bar span { margin-left: 12px; }
+  .body { padding: 26px 34px; }
+  .prompt { color: var(--dim); }
+  .reply { margin-top: 18px; display: flex; gap: 14px; }
+  .bullet { color: var(--text); }
+  .link { color: var(--link); }
+  .row { margin: 10px 0 0 30px; color: var(--dim); display: flex; gap: 14px; }
+  .entry { text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 4px; }
+  .entry.hover { animation: hover .25s 3.45s both; }
+  @keyframes hover { to { color: var(--text); text-decoration-color: var(--text); } }
+  .input {
+    position: absolute; left: 34px; right: 34px; bottom: 30px;
+    border-top: 1px solid var(--term-edge); border-bottom: 1px solid var(--term-edge);
+    padding: 10px 0; color: var(--dim);
+  }
+  .caret { display: inline-block; width: 10px; height: 20px; background: var(--dim); vertical-align: -3px; }
+
+  /* The browser that opens */
+  .browser {
+    position: absolute; left: 500px; top: 190px; width: 680px; height: 400px;
+    background: #fff; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 40px 100px rgba(0,0,0,.6);
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    opacity: 0;
+    animation: pop 1.6s 1.5s both;
+  }
+  @keyframes pop {
+    0% { opacity: 0; transform: translateY(30px) scale(.9); }
+    20%, 80% { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateY(10px) scale(.97); }
+  }
+  .tabs { height: 38px; background: #dfe1e5; display: flex; align-items: flex-end; padding: 0 10px; }
+  .tab { background: #fff; border-radius: 8px 8px 0 0; padding: 8px 16px; font-size: 13px; color: #202124; }
+  .urlbar { height: 40px; background: #fff; border-bottom: 1px solid #e3e3e3; display: flex; align-items: center; padding: 0 14px; }
+  .url { background: #f1f3f4; border-radius: 16px; padding: 6px 16px; font-size: 14px; color: #202124; width: 100%; }
+  .page { background: #f0f0f2; height: calc(100% - 78px); display: flex; align-items: center; justify-content: center; }
+  .card { background: #fdfdff; border-radius: 8px; padding: 28px 36px; width: 520px; box-shadow: 2px 3px 7px 2px rgba(0,0,0,.02); }
+  .card h1 { font-size: 30px; margin-bottom: 14px; color: #000; }
+  .card p { font-size: 15px; line-height: 1.5; color: #333; }
+  .card a { color: #38488f; }
+
+  /* The pointer and its click ring */
+  .cursor {
+    position: absolute; left: 0; top: 0; width: 26px; height: 26px; z-index: 5;
+    animation: path 3.7s 0s both;
+  }
+  @keyframes path {
+    0% { transform: translate(1180px, 700px); }
+    8% { transform: translate(1180px, 700px); }
+    32%, 74% { transform: translate(var(--x1), var(--y1)); }
+    93%, 100% { transform: translate(var(--x2), var(--y2)); }
+  }
+  .cursor svg {
+    width: 32px; height: 32px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5));
+    transform-origin: 5px 3px; animation: press .2s 1.3s both;
+  }
+  @keyframes press { 50% { scale: .82; } }
+  .ring {
+    position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%;
+    border: 4px solid var(--accent); left: var(--rx); top: var(--ry); opacity: 0;
+    animation: ring .5s 1.33s forwards;
+  }
+  @keyframes ring { 0% { opacity: 1; transform: scale(.3); } 100% { opacity: 0; transform: scale(1.4); } }
+
+  /* End card */
+  .end {
+    position: absolute; inset: 0; z-index: 10;
+    background: linear-gradient(160deg, rgba(27,21,48,.97), rgba(13,11,24,.98));
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    opacity: 0; animation: endin .35s 4.0s both;
+  }
+  @keyframes endin { from { opacity: 0; } to { opacity: 1; } }
+  .end h2 { font-size: 64px; font-weight: 800; letter-spacing: -0.03em; }
+  .end h2 em { font-style: normal; color: var(--accent); }
+  .end p { font-size: 24px; color: #c9c4d8; }
+  .chip {
+    margin-top: 10px; font-family: var(--mono); font-size: 20px;
+    background: #231f33; border: 1px solid var(--term-edge); border-radius: 10px; padding: 12px 22px;
+  }
+  .chip b { color: var(--accent); font-weight: 400; }
+</style>
+</head>
+<body>
+  <div class="headline h1">Links in Claude's replies…</div>
+  <div class="headline h2">…open with <em>one click</em></div>
+  <div class="headline h3">Every link listed, <em>hover to underline</em></div>
+
+  <div class="term">
+    <div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>~/projects — claude</span></div>
+    <div class="body">
+      <div class="prompt">&gt; where can I read about this?</div>
+      <div class="reply">
+        <span class="bullet">●</span>
+        <div>
+          The page is at <span class="link" id="target1">https://example.com</span>, and the<br>
+          source lives in the <span class="link">claude-mods</span> repo.
+        </div>
+      </div>
+      <div class="row">
+        <span>↳</span>
+        <span class="entry">example.com</span>
+        <span class="entry hover" id="target2">github.com/marvreichmann/claude-mods</span>
+      </div>
+    </div>
+    <div class="input">&gt; <span class="caret"></span></div>
+  </div>
+
+  <div class="browser">
+    <div class="tabs"><div class="tab">Example Domain</div></div>
+    <div class="urlbar"><div class="url">example.com</div></div>
+    <div class="page">
+      <div class="card">
+        <h1>Example Domain</h1>
+        <p>This domain is for use in documentation examples without needing permission. Avoid use in operations.</p>
+        <p style="margin-top:12px"><a>Learn more</a></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="ring"></div>
+  <div class="cursor">
+    <svg viewBox="0 0 24 24"><path d="M4 2l15 10-7 1.5 4.5 8-3 1.5-4.5-8L4 20z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>
+  </div>
+
+  <div class="end">
+    <h2>Clickable <em>Links</em></h2>
+    <p>A Claude Code mod: click a link in a reply, it opens in your browser.</p>
+    <div class="chip"><b>/plugin install</b> clickable-links@reichmann-mods</div>
+  </div>
+
+<script>
+  // Aim the pointer at the two links: its tip sits a little inside each one.
+  const aim = (el, name) => {
+    const box = el.getBoundingClientRect()
+    const x = box.left + box.width * 0.45, y = box.top + box.height * 0.55
+    document.documentElement.style.setProperty(`--${name}x`, `${x}px`)
+    document.documentElement.style.setProperty(`--${name}y`, `${y}px`)
+    return [x, y]
+  }
+  window.ready = document.fonts.ready.then(() => {
+    seek(2.5) // measure with the terminal settled, past its entrance
+    const [x1, y1] = aim(document.getElementById('target1'), 'a')
+    const [x2, y2] = aim(document.getElementById('target2'), 'b')
+    const root = document.documentElement.style
+    root.setProperty('--x1', `${x1 - 4}px`); root.setProperty('--y1', `${y1 - 3}px`)
+    root.setProperty('--x2', `${x2 - 4}px`); root.setProperty('--y2', `${y2 - 3}px`)
+    root.setProperty('--rx', `${x1}px`); root.setProperty('--ry', `${y1}px`)
+  })
+  // Freeze every animation at `seconds`; render.mjs calls this per frame.
+  window.seek = seconds => {
+    for (const animation of document.getAnimations()) {
+      animation.pause()
+      animation.currentTime = seconds * 1000
+    }
+  }
+</script>
+</body>
+</html>

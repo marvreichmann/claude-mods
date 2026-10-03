@@ -2,6 +2,8 @@
 
 Click a link in Claude's reply and it opens in your browser. Claude Code's fullscreen terminal takes over the mouse, so the terminal's own link handling doesn't reach the links in a reply; this mod opens them on a plain click.
 
+![clickable-links: a click on a link in Claude's reply opens it in the browser; the row of links under the reply underlines on hover](https://raw.githubusercontent.com/marvreichmann/claude-mods/main/media/clickable-links.gif)
+
 Each reply that has links also ends with a dim row of them, host and path only:
 
 ```
@@ -34,6 +36,10 @@ In Claude Code:
 
 - Another mod that redraws Claude's replies (for example [claude-mdview](https://github.com/xuanji86/claude-mdview)) competes for the same drawing; only one of them draws a given reply
 - Links are found by pattern: a URL with parentheses in it is cut at the first one
+
+## Demo clip
+
+`media/clickable-links.gif` and `.mp4` are rendered from `media/src/clickable-links/demo.html`, a mock-up of the terminal, with `node media/src/clickable-links/render.mjs` (needs Chromium and ffmpeg).
 
 ## Tests
 
