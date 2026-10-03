@@ -200,46 +200,37 @@ const headed = (c: Cells, fill: Fill, pill = c.colors.pill, pillText = c.colors.
   return { start, end }
 }
 
-// GitHub's own contribution greens, dark mode, for a finished bar.
-const GITHUB_GREENS = [0x0e4429, 0x006d32, 0x26a641, 0x39d353]
-// The small square: in JetBrains Mono and most fonts the full one (■) fills its cell and runs together.
-const SQUARE = 0x25aa
-const TERMINAL_BG = 0x01000000
+// Braille dot bits by [column][row] of the 2x4 cell.
+const BRAILLE = [
+  [0x01, 0x02, 0x04, 0x40],
+  [0x08, 0x10, 0x20, 0x80],
+]
 
 /**
- * GitHub's contribution graph: a row of squares in four levels of the accent,
- * brighter and busier toward the head, each lighting up and fading on its own
- * time; dim empty squares ahead, a gap where one stage ends and the next begins.
+ * A grid of dots on the tinted bar, four rows deep: sparse at the tail and
+ * filling in toward the pill, each dot switching on and off on its own time.
  */
 const pixel = (plan: Plan, c: Cells, frame: number) => {
-  const { put, width, colors, ticks } = c
-  const levels =
-    plan.status === 'done'
-      ? GITHUB_GREENS
-      : [mix(TRACK, colors.pill, 0.45), mix(TRACK, colors.pill, 0.7), colors.pill, colors.hi]
-  const empty = mix(TRACK, TRACK_TICK, 0.5)
+  const { put, colors, ticks } = c
   const moving = plan.status === 'active'
-  const { end } = headed(
-    c,
-    (x, start) => {
-      if (ticks.get(x)) return put(x, 0x20, TERMINAL_BG, TERMINAL_BG)
-      // Each square keeps its level for a while, then re-rolls: offsets keep them out of step.
-      const epoch = moving ? Math.floor((frame + noise(x, 3) * 40) / 40) : 0
-      const near = x / Math.max(1, start)
-      const r = noise(x, epoch * 31 + 5)
-      const busy = plan.status === 'done' ? 1 : 0.65 + 0.35 * near
-      if (r > busy) return put(x, SQUARE, empty, TERMINAL_BG)
-      const level = Math.min(3, Math.floor(noise(x + 11, epoch * 17) * (1.6 + 2.6 * near)))
-      put(x, SQUARE, levels[level]!, TERMINAL_BG)
-    },
-    undefined,
-    undefined,
-    TERMINAL_BG,
-  )
-  // Ahead of the head: empty squares, a gap at each stage's end.
-  for (let x = end; x < width; x++) {
-    put(x, ticks.get(x) ? 0x20 : SQUARE, empty, TERMINAL_BG)
-  }
+  headed(c, (x, start) => {
+    const major = ticks.get(x)
+    if (major) return put(x, 0x2502, colors.tick, colors.fill)
+    const near = x / Math.max(1, start)
+    const density = plan.status === 'done' ? 0.55 : 0.12 + 0.78 * Math.pow(near, 1.4)
+    let bits = 0
+    for (let dx = 0; dx < 2; dx++) {
+      for (let dy = 0; dy < 4; dy++) {
+        const dot = (2 * x + dx) * 4 + dy
+        // Each dot keeps its state for a while, out of step with its neighbours.
+        const epoch = moving ? Math.floor((frame + noise(dot, 3) * 36) / 36) : 0
+        if (noise(dot, epoch * 29 + 1) < density) bits |= BRAILLE[dx]![dy]!
+      }
+    }
+    const cellEpoch = moving ? Math.floor((frame + noise(x, 9) * 24) / 24) : 0
+    const glow = (0.25 + 0.75 * near) * (0.55 + 0.45 * noise(x, cellEpoch * 13 + 2))
+    put(x, 0x2800 + bits, mix(colors.dot, colors.hi, glow), colors.fill)
+  })
 }
 
 /** A finished bar in one solid color, the pill at its end. */
