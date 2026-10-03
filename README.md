@@ -1,8 +1,25 @@
 # Claude Code mods
 
-Safe fork of [zycck/claude-mods](https://github.com/zycck/claude-mods) at plan-progress 0.5.0. Same bars. The undocumented `id: "reel"` recorder, which wrote a JSON file to the path in `note`, is gone. Windows sounds go through `sounds/play.ps1`, which allowlists the name and builds the wav path itself. Linux and macOS use the engine player only.
+Mods for Claude Code (function-hook plugins), in one marketplace:
+
+- [clickable-links](#clickable-links): click links in Claude's replies to open them in your browser
+- [plan-progress](#plan-progress): live progress bars above the prompt
+
+```
+/plugin marketplace add marvreichmann/claude-mods
+```
+
+## clickable-links
+
+Click a link in Claude's reply and it opens in your browser, in Claude Code's fullscreen terminal. Each reply with links also ends with a dim row of them that underline on hover. URLs in code are left alone. See [its README](plugins/clickable-links/README.md).
+
+```
+/plugin install clickable-links@reichmann-mods
+```
 
 ## plan-progress
+
+Safe fork of [zycck/claude-mods](https://github.com/zycck/claude-mods) at plan-progress 0.5.0. Same bars. The undocumented `id: "reel"` recorder, which wrote a JSON file to the path in `note`, is gone. Windows sounds go through `sounds/play.ps1`, which allowlists the name and builds the wav path itself. Linux and macOS use the engine player only.
 
 Live progress bars above the Claude Code prompt. Claude breaks medium and large tasks into stages and steps, and you watch them fill in real time, with the subagents working on each task right under its bar.
 
@@ -54,4 +71,4 @@ Built with Claude Code mods (function hooks). The bar looks best in the desktop 
 
 ## License
 
-MIT
+MIT. plan-progress: [LICENSE](LICENSE). clickable-links: [its LICENSE](plugins/clickable-links/LICENSE).
