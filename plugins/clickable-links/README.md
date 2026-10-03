@@ -22,6 +22,7 @@ Hover an entry and it underlines; click it and it opens.
 
 - **Runs:** your system's URL opener, with the URL of the link you clicked as its only argument, when you click: `xdg-open <url>` on Linux, `open <url>` on macOS, `rundll32 url.dll,FileProtocolHandler <url>` on Windows. It tries them in that order and stops at the first that succeeds. Nothing runs until you click
 - **Reads:** the text of Claude's replies as Claude Code draws them, to find the `http` and `https` links in them
+- **Sends:** nothing leaves your machine through the plugin. The only thing it passes outside itself is the URL you clicked, to the local opener above, which hands it to your default browser. No conversation text or anything else is passed to any program
 - **Network:** none. The plugin fetches nothing; your browser opens the link
 - **Stores:** nothing. No files written, no settings saved, no data collected or sent anywhere
 
